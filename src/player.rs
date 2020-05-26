@@ -1,21 +1,38 @@
 mod rodio;
 
+use crate::source::Source;
+
 #[derive(Debug)]
 pub struct Player {
-    #[cfg(target = "wasm")]
+    #[cfg(target_arch = "wasm32")]
     backend: (),
-    #[cfg(not(target = "wasm"))]
+    #[cfg(not(target_arch = "wasm32"))]
     backend: rodio::Rodio,
 }
 
-trait Backend {
-    fn new() -> Self;
+impl Player {
+    pub fn new() -> Option<Self> {
+        Backend::new().map(|backend| Player { backend })
+    }
 
-    fn append<S>(&self, stream: &S)
+    pub fn play<S>(&self, stream: S)
     where
-        S: Stream;
+        S: Source + 'static,
+    {
+        self.backend.play(stream)
+    }
 
-    fn play(&self);
+    pub fn wait(&self) {
+        self.backend.wait()
+    }
+}
+
+trait Backend: Sized {
+    fn new() -> Option<Self>;
+
+    fn play<S>(&self, stream: S)
+    where
+        S: Source + 'static;
 
     fn wait(&self);
 }

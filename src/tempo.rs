@@ -1,6 +1,6 @@
-use crate::num::RatioExt;
-use num::{rational::Ratio, Num};
-use std::time::Duration;
+use crate::num::{Natural, NaturalRatio};
+use num::Zero;
+use std::{convert::TryFrom, error::Error, fmt, time::Duration};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u32)]
@@ -29,9 +29,9 @@ pub enum Dot {
 }
 
 impl Dot {
-    pub fn numeric(&self) -> Ratio<u128> {
-        let base = *self as u32 as u128;
-        Ratio::new(base * 2 - 1, base)
+    pub fn numeric(&self) -> NaturalRatio {
+        let base = Natural::from(*self as u32);
+        NaturalRatio::new(base * 2 - 1, base)
     }
 }
 
@@ -40,23 +40,33 @@ pub struct Note {
     pub base: Base,
     pub dot: Dot,
     pub tuplet: u32,
-    pub whole_bpm: f32,
+    pub whole_bpm: NaturalRatio,
 }
 
 impl Note {
-    pub fn measure(&self) -> Ratio<u128> {
-        let divisor =
-            Ratio::new(self.base.numeric() as u128 * 2, self.tuplet as u128);
-        let dividend = Ratio::from(self.base.numeric() as u128);
+    pub fn measure(&self) -> NaturalRatio {
+        let dividend = self.dot.numeric();
+        let divisor = NaturalRatio::new(
+            Natural::from(self.base.numeric()) * 2,
+            Natural::from(self.tuplet),
+        );
         dividend / divisor
     }
 
     pub fn duration(&self) -> Duration {
-        let numer = 60.0 / self.whole_bpm * self.dot.numeric().approx_to_f32();
-        let denom = self.base.numeric() as f32 * (2.0 / self.tuplet as f32);
-        let secs = numer / denom;
-        let nanos = secs * Duration::from_secs(1).as_nanos() as f32;
-        Duration::from_nanos(nanos as u64)
+        let dividend =
+            NaturalRatio::from(60) / self.whole_bpm * self.dot.numeric();
+        let divisor = NaturalRatio::new(
+            Natural::from(self.base.numeric()) * 2,
+            Natural::from(self.tuplet),
+        );
+        let secs = dividend / divisor;
+        let nanos =
+            secs * NaturalRatio::from(Duration::from_secs(1).as_nanos());
+        Duration::from_nanos(
+            u64::try_from(nanos.to_integer())
+                .expect("Too many seconds in a note"),
+        )
     }
 }
 
@@ -66,8 +76,32 @@ pub struct Signature {
     pub denom: Base,
 }
 
+impl Signature {
+    pub fn ratio(&self) -> NaturalRatio {
+        NaturalRatio::new(
+            Natural::from(self.numer),
+            Natural::from(self.denom.numeric()),
+        )
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub struct InvalidCompass;
+pub struct InvalidCompass {
+    pub found: NaturalRatio,
+    pub expected: NaturalRatio,
+}
+
+impl fmt::Display for InvalidCompass {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            fmt,
+            "Invalid compass length: found {}, expected {}",
+            self.found, self.expected
+        )
+    }
+}
+
+impl Error for InvalidCompass {}
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct Compass {
@@ -81,11 +115,15 @@ impl Compass {
         signature: Signature,
         notes: Vec<Note>,
     ) -> Result<Self, InvalidCompass> {
-        let mut sum = Ratio::zero();
+        let mut sum = NaturalRatio::zero();
         for note in &notes {
-            let base = note.base.numeric();
+            sum += note.measure();
         }
 
-        Ok(Self { signature, notes, _private: () })
+        if sum == signature.ratio() {
+            Ok(Self { signature, notes, _private: () })
+        } else {
+            Err(InvalidCompass { expected: signature.ratio(), found: sum })
+        }
     }
 }

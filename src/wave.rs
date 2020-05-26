@@ -1,16 +1,23 @@
-use rodio::Source;
-use std::{f32::consts::PI, time::Duration};
+use crate::{
+    num::{real::consts::PI, Real},
+    source::Source,
+};
+use std::time::Duration;
 
-pub trait Wave: Source<Item = f32> {
-    fn freq(&self) -> f32;
+pub trait Wave: Source {
+    fn freq(&self) -> Real;
 }
 
 pub trait WaveBuilder {
     type Wave: Wave;
 
-    fn freq(&mut self, freq: f32) -> &mut Self;
+    fn freq(&mut self, freq: Real) -> &mut Self;
 
-    fn get_freq(&self) -> f32;
+    fn get_freq(&self) -> Real;
+
+    fn sample_rate(&mut self, rate: u32) -> &mut Self;
+
+    fn get_sample_rate(&self) -> u32;
 
     fn finish(&mut self) -> Self::Wave;
 }
@@ -21,13 +28,22 @@ where
 {
     type Wave = B::Wave;
 
-    fn freq(&mut self, freq: f32) -> &mut Self {
+    fn freq(&mut self, freq: Real) -> &mut Self {
         (**self).freq(freq);
         self
     }
 
-    fn get_freq(&self) -> f32 {
+    fn get_freq(&self) -> Real {
         (**self).get_freq()
+    }
+
+    fn sample_rate(&mut self, rate: u32) -> &mut Self {
+        (**self).sample_rate(rate);
+        self
+    }
+
+    fn get_sample_rate(&self) -> u32 {
+        (**self).get_sample_rate()
     }
 
     fn finish(&mut self) -> Self::Wave {
@@ -37,23 +53,27 @@ where
 
 #[derive(Debug, Clone)]
 pub struct SineWave {
-    freq: f32,
+    freq: Real,
     index: usize,
 }
 
 impl Iterator for SineWave {
-    type Item = f32;
+    type Item = Real;
 
-    fn next(&mut self) -> Option<f32> {
+    fn next(&mut self) -> Option<Real> {
         self.index = self.index.wrapping_add(1);
 
-        let index = self.index as f32;
+        let index = self.index as Real;
         let coeficient = PI * 2.0 * self.freq;
         Some((coeficient * index / 48000.0).sin())
     }
 }
 
 impl Source for SineWave {
+    fn total_len(&self) -> Option<usize> {
+        None
+    }
+
     fn current_frame_len(&self) -> Option<usize> {
         None
     }
@@ -72,32 +92,42 @@ impl Source for SineWave {
 }
 
 impl Wave for SineWave {
-    fn freq(&self) -> f32 {
+    fn freq(&self) -> Real {
         self.freq
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct SineWaveBuilder {
-    freq: f32,
+    freq: Real,
+    sample_rate: u32,
 }
 
 impl Default for SineWaveBuilder {
     fn default() -> Self {
-        Self { freq: 440.0 }
+        Self { freq: 440.0, sample_rate: 48000 }
     }
 }
 
 impl WaveBuilder for SineWaveBuilder {
     type Wave = SineWave;
 
-    fn freq(&mut self, freq: f32) -> &mut Self {
+    fn freq(&mut self, freq: Real) -> &mut Self {
         self.freq = freq;
         self
     }
 
-    fn get_freq(&self) -> f32 {
+    fn get_freq(&self) -> Real {
         self.freq
+    }
+
+    fn sample_rate(&mut self, sample_rate: u32) -> &mut Self {
+        self.sample_rate = sample_rate;
+        self
+    }
+
+    fn get_sample_rate(&self) -> u32 {
+        self.sample_rate
     }
 
     fn finish(&mut self) -> Self::Wave {
@@ -107,14 +137,14 @@ impl WaveBuilder for SineWaveBuilder {
 
 #[derive(Debug, Clone)]
 pub struct SawWave {
-    index: f32,
-    freq: f32,
+    index: Real,
+    freq: Real,
 }
 
 impl Iterator for SawWave {
-    type Item = f32;
+    type Item = Real;
 
-    fn next(&mut self) -> Option<f32> {
+    fn next(&mut self) -> Option<Real> {
         let period = 48000.0 / self.freq;
         if self.index > period {
             self.index -= period;
@@ -128,6 +158,10 @@ impl Iterator for SawWave {
 }
 
 impl Source for SawWave {
+    fn total_len(&self) -> Option<usize> {
+        None
+    }
+
     fn current_frame_len(&self) -> Option<usize> {
         None
     }
@@ -146,32 +180,42 @@ impl Source for SawWave {
 }
 
 impl Wave for SawWave {
-    fn freq(&self) -> f32 {
+    fn freq(&self) -> Real {
         self.freq
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct SawWaveBuilder {
-    freq: f32,
+    freq: Real,
+    sample_rate: u32,
 }
 
 impl Default for SawWaveBuilder {
     fn default() -> Self {
-        Self { freq: 440.0 }
+        Self { freq: 440.0, sample_rate: 48000 }
     }
 }
 
 impl WaveBuilder for SawWaveBuilder {
     type Wave = SawWave;
 
-    fn freq(&mut self, freq: f32) -> &mut Self {
+    fn freq(&mut self, freq: Real) -> &mut Self {
         self.freq = freq;
         self
     }
 
-    fn get_freq(&self) -> f32 {
+    fn get_freq(&self) -> Real {
         self.freq
+    }
+
+    fn sample_rate(&mut self, sample_rate: u32) -> &mut Self {
+        self.sample_rate = sample_rate;
+        self
+    }
+
+    fn get_sample_rate(&self) -> u32 {
+        self.sample_rate
     }
 
     fn finish(&mut self) -> Self::Wave {
@@ -185,17 +229,17 @@ where
 {
     wave: W,
     helpers: Vec<W>,
-    dry: f32,
-    wet: f32,
+    dry: Real,
+    wet: Real,
 }
 
 impl<W> Iterator for RichWave<W>
 where
     W: Wave,
 {
-    type Item = f32;
+    type Item = Real;
 
-    fn next(&mut self) -> Option<f32> {
+    fn next(&mut self) -> Option<Real> {
         let mut value = self.wave.next()? * self.dry;
 
         for helper in &mut self.helpers {
@@ -206,25 +250,44 @@ where
     }
 }
 
+fn option_min<I, T>(init: Option<T>, iterable: I) -> Option<T>
+where
+    I: IntoIterator<Item = Option<T>>,
+    T: Ord,
+{
+    let mut ret = init;
+
+    for elem in iterable {
+        if let Some(curr) = ret {
+            if let Some(val) = elem.filter(|val| val < &curr) {
+                ret = Some(val);
+            } else {
+                ret = Some(curr);
+            }
+        } else {
+            ret = elem;
+        }
+    }
+
+    ret
+}
+
 impl<W> Source for RichWave<W>
 where
     W: Wave,
 {
+    fn total_len(&self) -> Option<usize> {
+        option_min(
+            self.wave.total_len(),
+            self.helpers.iter().map(|helper| helper.total_len()),
+        )
+    }
+
     fn current_frame_len(&self) -> Option<usize> {
-        let mut ret = self.wave.current_frame_len();
-
-        for helper in &self.helpers {
-            let frame = helper.current_frame_len();
-            if let Some(curr) = ret {
-                if let Some(val) = frame.filter(|&val| val < curr) {
-                    ret = Some(val);
-                }
-            } else {
-                ret = frame;
-            }
-        }
-
-        ret
+        option_min(
+            self.wave.current_frame_len(),
+            self.helpers.iter().map(|helper| helper.current_frame_len()),
+        )
     }
 
     fn channels(&self) -> u16 {
@@ -236,20 +299,10 @@ where
     }
 
     fn total_duration(&self) -> Option<Duration> {
-        let mut ret = self.wave.total_duration();
-
-        for helper in &self.helpers {
-            let frame = helper.total_duration();
-            if let Some(curr) = ret {
-                if let Some(val) = frame.filter(|val| val < &curr) {
-                    ret = Some(val);
-                }
-            } else {
-                ret = frame;
-            }
-        }
-
-        ret
+        option_min(
+            self.wave.total_duration(),
+            self.helpers.iter().map(|helper| helper.total_duration()),
+        )
     }
 }
 
@@ -257,7 +310,7 @@ impl<W> Wave for RichWave<W>
 where
     W: Wave,
 {
-    fn freq(&self) -> f32 {
+    fn freq(&self) -> Real {
         self.wave.freq()
     }
 }
@@ -268,10 +321,10 @@ where
     B: WaveBuilder,
 {
     depth: usize,
-    dry: f32,
-    wet: f32,
-    min: f32,
-    max: f32,
+    dry: Real,
+    wet: Real,
+    min: Real,
+    max: Real,
     inner: B,
 }
 
@@ -288,22 +341,22 @@ where
         self
     }
 
-    pub fn min(&mut self, min: f32) -> &mut Self {
+    pub fn min(&mut self, min: Real) -> &mut Self {
         self.min = min;
         self
     }
 
-    pub fn max(&mut self, max: f32) -> &mut Self {
+    pub fn max(&mut self, max: Real) -> &mut Self {
         self.max = max;
         self
     }
 
-    pub fn dry(&mut self, dry: f32) -> &mut Self {
+    pub fn dry(&mut self, dry: Real) -> &mut Self {
         self.dry = dry;
         self
     }
 
-    pub fn wet(&mut self, wet: f32) -> &mut Self {
+    pub fn wet(&mut self, wet: Real) -> &mut Self {
         self.wet = wet;
         self
     }
@@ -312,19 +365,19 @@ where
         self.depth
     }
 
-    pub fn get_min(&self) -> f32 {
+    pub fn get_min(&self) -> Real {
         self.min
     }
 
-    pub fn get_max(&self) -> f32 {
+    pub fn get_max(&self) -> Real {
         self.max
     }
 
-    pub fn get_dry(&self) -> f32 {
+    pub fn get_dry(&self) -> Real {
         self.dry
     }
 
-    pub fn get_wet(&self) -> f32 {
+    pub fn get_wet(&self) -> Real {
         self.wet
     }
 }
@@ -335,22 +388,31 @@ where
 {
     type Wave = RichWave<B::Wave>;
 
-    fn freq(&mut self, freq: f32) -> &mut Self {
+    fn freq(&mut self, freq: Real) -> &mut Self {
         self.inner.freq(freq);
         self
     }
 
-    fn get_freq(&self) -> f32 {
+    fn get_freq(&self) -> Real {
         self.inner.get_freq()
+    }
+
+    fn sample_rate(&mut self, sample_rate: u32) -> &mut Self {
+        self.inner.sample_rate(sample_rate);
+        self
+    }
+
+    fn get_sample_rate(&self) -> u32 {
+        self.inner.get_sample_rate()
     }
 
     fn finish(&mut self) -> Self::Wave {
         let wave = self.inner.finish();
         let mut helpers = Vec::with_capacity(self.depth);
 
-        let leap = (self.max - self.min) / self.depth as f32;
+        let leap = (self.max - self.min) / self.depth as Real;
         for i in 0 .. self.depth {
-            let freq = self.min + i as f32 * leap;
+            let freq = self.min + i as Real * leap;
             helpers.push(self.inner.freq(freq).finish());
         }
 
