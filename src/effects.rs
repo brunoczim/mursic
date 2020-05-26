@@ -1,5 +1,5 @@
 use crate::{
-    num::{Natural, NaturalRatio, RatioExt, Real},
+    num::{DurationExt, Natural, NaturalRatio, Real},
     source::Source,
 };
 use num::{traits::CheckedSub, Zero};
@@ -166,11 +166,6 @@ where
     }
 
     fn total_duration(&self) -> Option<Duration> {
-        let nanos = self.remaining.to_integer();
-
-        let one_sec = Duration::from_secs(1).as_nanos();
-        let secs = (nanos / one_sec) as u64;
-        let subsec_nanos = (nanos % one_sec) as u32;
-        Some(Duration::new(secs, subsec_nanos))
+        Some(Duration::from_raw_nanos(self.remaining.to_integer()))
     }
 }

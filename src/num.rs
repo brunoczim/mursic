@@ -1,4 +1,5 @@
 use num::{cast::ToPrimitive, rational::Ratio, Num};
+use std::{convert::TryFrom, time::Duration};
 
 pub use std::{f64 as real, i128 as integer, u128 as natural};
 
@@ -50,5 +51,20 @@ where
                 ratio.denom().clone() / two(),
             );
         }
+    }
+}
+
+pub trait DurationExt {
+    fn from_raw_nanos(nanos: u128) -> Self;
+}
+
+impl DurationExt for Duration {
+    fn from_raw_nanos(nanos: u128) -> Self {
+        let one_sec = Duration::from_secs(1).as_nanos();
+        let secs = u64::try_from(nanos / one_sec).expect("Unsupported nanos");
+        let subsec_nanos =
+            u32::try_from(nanos % one_sec).expect("Unsupported nanos");
+
+        Self::new(secs, subsec_nanos)
     }
 }

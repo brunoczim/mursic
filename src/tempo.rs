@@ -1,6 +1,6 @@
-use crate::num::{Natural, NaturalRatio};
+use crate::num::{DurationExt, Natural, NaturalRatio};
 use num::Zero;
-use std::{convert::TryFrom, error::Error, fmt, time::Duration};
+use std::{error::Error, fmt, time::Duration};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u32)]
@@ -64,11 +64,7 @@ impl Note {
         let nanos =
             secs * NaturalRatio::from(Duration::from_secs(1).as_nanos());
 
-        let one_sec = Duration::from_secs(1).as_nanos();
-        let nanos = nanos.to_integer();
-        let secs = (nanos / one_sec) as u64;
-        let subsec_nanos = (nanos % one_sec) as u32;
-        Duration::new(secs, subsec_nanos)
+        Duration::from_raw_nanos(nanos.to_integer())
     }
 }
 
