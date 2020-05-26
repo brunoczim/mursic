@@ -63,10 +63,12 @@ impl Note {
         let secs = dividend / divisor;
         let nanos =
             secs * NaturalRatio::from(Duration::from_secs(1).as_nanos());
-        Duration::from_nanos(
-            u64::try_from(nanos.to_integer())
-                .expect("Too many seconds in a note"),
-        )
+
+        let one_sec = Duration::from_secs(1).as_nanos();
+        let nanos = nanos.to_integer();
+        let secs = (nanos / one_sec) as u64;
+        let subsec_nanos = (nanos % one_sec) as u32;
+        Duration::new(secs, subsec_nanos)
     }
 }
 

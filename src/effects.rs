@@ -166,15 +166,11 @@ where
     }
 
     fn total_duration(&self) -> Option<Duration> {
-        let nanos = if self.remaining.is_integer() {
-            *self.remaining.numer() as u128
-        } else {
-            self.remaining.approx_to_real() as u128
-        };
+        let nanos = self.remaining.to_integer();
 
         let one_sec = Duration::from_secs(1).as_nanos();
         let secs = (nanos / one_sec) as u64;
-        let nanos = (nanos % one_sec) as u32;
-        Some(Duration::new(secs, nanos))
+        let subsec_nanos = (nanos % one_sec) as u32;
+        Some(Duration::new(secs, subsec_nanos))
     }
 }
