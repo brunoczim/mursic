@@ -11,7 +11,7 @@ pub type Real = f64;
 pub trait RatioExt {
     fn approx_to_f64(&self) -> f64;
 
-    fn approx_real(&self) -> Real {
+    fn approx_to_real(&self) -> Real {
         self.approx_to_f64() as Real
     }
 
