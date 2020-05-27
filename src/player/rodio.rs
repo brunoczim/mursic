@@ -22,7 +22,11 @@ impl Backend for Rodio {
     where
         S: Source + 'static,
     {
-        self.sink.append(Bridge { inner: source });
+        self.sink.append(Bridge {
+            rate: source.sample_rate(),
+            channels: source.channels(),
+            inner: source,
+        });
         self.sink.play();
     }
 
@@ -37,6 +41,8 @@ where
     S: Source,
 {
     inner: S,
+    channels: u16,
+    rate: u32,
 }
 
 impl<S> Iterator for Bridge<S>
@@ -55,18 +61,18 @@ where
     S: Source,
 {
     fn total_duration(&self) -> Option<Duration> {
-        self.inner.total_duration()
+        self.inner.duration()
     }
 
     fn current_frame_len(&self) -> Option<usize> {
-        self.inner.current_frame_len()
+        self.inner.len()
     }
 
     fn channels(&self) -> u16 {
-        self.inner.channels()
+        self.channels
     }
 
     fn sample_rate(&self) -> u32 {
-        self.inner.sample_rate()
+        self.rate
     }
 }

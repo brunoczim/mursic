@@ -5,11 +5,9 @@ use crate::{
 use std::time::Duration;
 
 pub trait Source: Iterator<Item = Real> + Send + Sync {
-    fn total_len(&self) -> Option<usize>;
+    fn len(&self) -> Option<usize>;
 
-    fn current_frame_len(&self) -> Option<usize>;
-
-    fn total_duration(&self) -> Option<Duration>;
+    fn duration(&self) -> Option<Duration>;
 
     fn channels(&self) -> u16 {
         1
@@ -38,16 +36,12 @@ impl<'this, S> Source for &'this mut S
 where
     S: Source,
 {
-    fn total_len(&self) -> Option<usize> {
-        (**self).total_len()
+    fn len(&self) -> Option<usize> {
+        (**self).len()
     }
 
-    fn current_frame_len(&self) -> Option<usize> {
-        (**self).current_frame_len()
-    }
-
-    fn total_duration(&self) -> Option<Duration> {
-        (**self).total_duration()
+    fn duration(&self) -> Option<Duration> {
+        (**self).duration()
     }
 
     fn channels(&self) -> u16 {
@@ -63,16 +57,12 @@ impl<S> Source for Box<S>
 where
     S: Source + ?Sized,
 {
-    fn total_len(&self) -> Option<usize> {
-        (**self).total_len()
+    fn len(&self) -> Option<usize> {
+        (**self).len()
     }
 
-    fn current_frame_len(&self) -> Option<usize> {
-        (**self).current_frame_len()
-    }
-
-    fn total_duration(&self) -> Option<Duration> {
-        (**self).total_duration()
+    fn duration(&self) -> Option<Duration> {
+        (**self).duration()
     }
 
     fn channels(&self) -> u16 {

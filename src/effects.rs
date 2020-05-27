@@ -11,6 +11,7 @@ where
     S: Source,
 {
     inner: S,
+    channels: u16,
     channel: u16,
     step: Real,
     curr_vol: Real,
@@ -40,24 +41,20 @@ impl<S> Source for LinearFadeOut<S>
 where
     S: Source,
 {
-    fn total_len(&self) -> Option<usize> {
-        self.inner.total_len()
+    fn len(&self) -> Option<usize> {
+        self.inner.len()
     }
 
-    fn current_frame_len(&self) -> Option<usize> {
-        self.inner.current_frame_len()
+    fn duration(&self) -> Option<Duration> {
+        self.inner.duration()
     }
 
     fn channels(&self) -> u16 {
-        self.inner.channels()
+        self.channels
     }
 
     fn sample_rate(&self) -> u32 {
         self.inner.sample_rate()
-    }
-
-    fn total_duration(&self) -> Option<Duration> {
-        self.inner.total_duration()
     }
 }
 
@@ -95,9 +92,11 @@ impl LinearFadeOutBuilder {
     where
         S: Source,
     {
-        let len = source.total_len().unwrap_or(self.iterations);
+        let len = source.len().unwrap_or(self.iterations);
+        let channels = source.channels();
         LinearFadeOut {
-            channel: source.channels(),
+            channels,
+            channel: channels,
             inner: source,
             curr_vol: 1.0,
             final_vol: self.final_vol,
@@ -112,6 +111,7 @@ where
     S: Source,
 {
     inner: S,
+    channels: u16,
     channel: u16,
     remaining: NaturalRatio,
 }
@@ -121,22 +121,24 @@ where
     S: Source,
 {
     pub(crate) fn new(inner: S, duration: Duration) -> Self {
+        let channels = inner.channels();
         Self {
-            channel: inner.channels(),
+            channels,
+            channel: channels,
             inner,
             remaining: NaturalRatio::from(duration.as_nanos()),
         }
     }
 
-    fn max_total_duration(&self) -> Duration {
+    fn max_duration(&self) -> Duration {
         Duration::from_raw_nanos(self.remaining.to_integer())
     }
 
-    fn max_total_len(&self) -> usize {
+    fn max_len(&self) -> usize {
         let one_sec = Duration::from_secs(1).as_nanos();
         let rate = self.sample_rate() as Natural;
         let nanos_per_sample = NaturalRatio::new(rate, one_sec);
-        let nanos = NaturalRatio::from(self.max_total_duration().as_nanos());
+        let nanos = NaturalRatio::from(self.max_duration().as_nanos());
         let total_ratio = nanos_per_sample * nanos;
 
         total_ratio.to_integer() as usize
@@ -176,35 +178,27 @@ impl<S> Source for TakeDuration<S>
 where
     S: Source,
 {
-    fn total_len(&self) -> Option<usize> {
-        let ret = match self.inner.total_len() {
-            Some(len) => len.min(self.max_total_len()),
-            None => self.max_total_len(),
+    fn len(&self) -> Option<usize> {
+        let ret = match self.inner.len() {
+            Some(len) => len.min(self.max_len()),
+            None => self.max_len(),
         };
         Some(ret)
     }
 
-    fn current_frame_len(&self) -> Option<usize> {
-        let ret = match self.inner.current_frame_len() {
-            Some(len) => len.min(self.max_total_len()),
-            None => self.max_total_len(),
+    fn duration(&self) -> Option<Duration> {
+        let ret = match self.inner.duration() {
+            Some(duration) => duration.min(self.max_duration()),
+            None => self.max_duration(),
         };
         Some(ret)
     }
 
     fn channels(&self) -> u16 {
-        self.inner.channels()
+        self.channels
     }
 
     fn sample_rate(&self) -> u32 {
         self.inner.sample_rate()
-    }
-
-    fn total_duration(&self) -> Option<Duration> {
-        let ret = match self.inner.total_duration() {
-            Some(duration) => duration.min(self.max_total_duration()),
-            None => self.max_total_duration(),
-        };
-        Some(ret)
     }
 }

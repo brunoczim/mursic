@@ -70,11 +70,11 @@ impl Iterator for SineWave {
 }
 
 impl Source for SineWave {
-    fn total_len(&self) -> Option<usize> {
+    fn duration(&self) -> Option<Duration> {
         None
     }
 
-    fn current_frame_len(&self) -> Option<usize> {
+    fn len(&self) -> Option<usize> {
         None
     }
 
@@ -84,10 +84,6 @@ impl Source for SineWave {
 
     fn sample_rate(&self) -> u32 {
         48000
-    }
-
-    fn total_duration(&self) -> Option<Duration> {
-        None
     }
 }
 
@@ -158,11 +154,11 @@ impl Iterator for SawWave {
 }
 
 impl Source for SawWave {
-    fn total_len(&self) -> Option<usize> {
+    fn len(&self) -> Option<usize> {
         None
     }
 
-    fn current_frame_len(&self) -> Option<usize> {
+    fn duration(&self) -> Option<Duration> {
         None
     }
 
@@ -172,10 +168,6 @@ impl Source for SawWave {
 
     fn sample_rate(&self) -> u32 {
         48000
-    }
-
-    fn total_duration(&self) -> Option<Duration> {
-        None
     }
 }
 
@@ -276,17 +268,17 @@ impl<W> Source for RichWave<W>
 where
     W: Wave,
 {
-    fn total_len(&self) -> Option<usize> {
+    fn len(&self) -> Option<usize> {
         option_min(
-            self.wave.total_len(),
-            self.helpers.iter().map(|helper| helper.total_len()),
+            self.wave.len(),
+            self.helpers.iter().map(|helper| helper.len()),
         )
     }
 
-    fn current_frame_len(&self) -> Option<usize> {
+    fn duration(&self) -> Option<Duration> {
         option_min(
-            self.wave.current_frame_len(),
-            self.helpers.iter().map(|helper| helper.current_frame_len()),
+            self.wave.duration(),
+            self.helpers.iter().map(|helper| helper.duration()),
         )
     }
 
@@ -296,13 +288,6 @@ where
 
     fn sample_rate(&self) -> u32 {
         self.wave.sample_rate()
-    }
-
-    fn total_duration(&self) -> Option<Duration> {
-        option_min(
-            self.wave.total_duration(),
-            self.helpers.iter().map(|helper| helper.total_duration()),
-        )
     }
 }
 
