@@ -1,5 +1,5 @@
 use crate::{
-    effects::{LinearFadeOut, LinearFadeOutBuilder},
+    effects::{LinearFadeOut, LinearFadeOutBuilder, TakeDuration},
     num::Real,
 };
 use std::time::Duration;
@@ -24,6 +24,13 @@ pub trait Source: Iterator<Item = Real> + Send + Sync {
         Self: Sized,
     {
         LinearFadeOutBuilder::default().finish(self)
+    }
+
+    fn take_duration(self, duration: Duration) -> TakeDuration<Self>
+    where
+        Self: Sized,
+    {
+        TakeDuration::new(self, duration)
     }
 }
 

@@ -29,7 +29,7 @@ where
         if self.channel == 0 {
             self.channel = self.channels();
             if self.curr_vol > self.final_vol {
-                self.curr_vol -= self.step;
+                self.curr_vol = (self.curr_vol - self.step).max(0.0);
             }
         }
         Some(value)
@@ -116,6 +116,33 @@ where
     remaining: NaturalRatio,
 }
 
+impl<S> TakeDuration<S>
+where
+    S: Source,
+{
+    pub(crate) fn new(inner: S, duration: Duration) -> Self {
+        Self {
+            channel: inner.channels(),
+            inner,
+            remaining: NaturalRatio::from(duration.as_nanos()),
+        }
+    }
+
+    fn max_total_duration(&self) -> Duration {
+        Duration::from_raw_nanos(self.remaining.to_integer())
+    }
+
+    fn max_total_len(&self) -> usize {
+        let one_sec = Duration::from_secs(1).as_nanos();
+        let rate = self.sample_rate() as Natural;
+        let nanos_per_sample = NaturalRatio::new(rate, one_sec);
+        let nanos = NaturalRatio::from(self.max_total_duration().as_nanos());
+        let total_ratio = nanos_per_sample * nanos;
+
+        total_ratio.to_integer() as usize
+    }
+}
+
 impl<S> Iterator for TakeDuration<S>
 where
     S: Source,
@@ -150,11 +177,19 @@ where
     S: Source,
 {
     fn total_len(&self) -> Option<usize> {
-        self.inner.total_len()
+        let ret = match self.inner.total_len() {
+            Some(len) => len.min(self.max_total_len()),
+            None => self.max_total_len(),
+        };
+        Some(ret)
     }
 
     fn current_frame_len(&self) -> Option<usize> {
-        self.inner.current_frame_len()
+        let ret = match self.inner.current_frame_len() {
+            Some(len) => len.min(self.max_total_len()),
+            None => self.max_total_len(),
+        };
+        Some(ret)
     }
 
     fn channels(&self) -> u16 {
@@ -166,6 +201,10 @@ where
     }
 
     fn total_duration(&self) -> Option<Duration> {
-        Some(Duration::from_raw_nanos(self.remaining.to_integer()))
+        let ret = match self.inner.total_duration() {
+            Some(duration) => duration.min(self.max_total_duration()),
+            None => self.max_total_duration(),
+        };
+        Some(ret)
     }
 }

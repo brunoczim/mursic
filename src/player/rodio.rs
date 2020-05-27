@@ -22,8 +22,8 @@ impl Backend for Rodio {
     where
         S: Source + 'static,
     {
-        self.sink.stop();
         self.sink.append(Bridge { inner: source });
+        self.sink.play();
     }
 
     fn wait(&self) {
