@@ -1,6 +1,5 @@
 use crate::num::{DurationExt, Natural, NaturalRatio};
-use num::Zero;
-use std::{error::Error, fmt, time::Duration};
+use std::time::Duration;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u32)]
@@ -35,7 +34,22 @@ impl Dot {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Signature {
+    pub numer: u32,
+    pub denom: Base,
+}
+
+impl Signature {
+    pub fn ratio(&self) -> NaturalRatio {
+        NaturalRatio::new(
+            Natural::from(self.numer),
+            Natural::from(self.denom.numeric()),
+        )
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Note {
     pub base: Base,
     pub dot: Dot,
@@ -53,7 +67,7 @@ impl Note {
         dividend / divisor
     }
 
-    pub fn duration(&self) -> Duration {
+    pub fn nanos(&self) -> NaturalRatio {
         let dividend =
             NaturalRatio::from(60) / self.whole_bpm * self.dot.numeric();
         let divisor = NaturalRatio::new(
@@ -64,64 +78,10 @@ impl Note {
         let nanos =
             secs * NaturalRatio::from(Duration::from_secs(1).as_nanos());
 
-        Duration::from_raw_nanos(nanos.to_integer())
+        nanos
     }
-}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Signature {
-    pub numer: u32,
-    pub denom: Base,
-}
-
-impl Signature {
-    pub fn ratio(&self) -> NaturalRatio {
-        NaturalRatio::new(
-            Natural::from(self.numer),
-            Natural::from(self.denom.numeric()),
-        )
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub struct InvalidCompass {
-    pub found: NaturalRatio,
-    pub expected: NaturalRatio,
-}
-
-impl fmt::Display for InvalidCompass {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            fmt,
-            "Invalid compass length: found {}, expected {}",
-            self.found, self.expected
-        )
-    }
-}
-
-impl Error for InvalidCompass {}
-
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub struct Compass {
-    pub signature: Signature,
-    pub notes: Vec<Note>,
-    _private: (),
-}
-
-impl Compass {
-    pub fn new(
-        signature: Signature,
-        notes: Vec<Note>,
-    ) -> Result<Self, InvalidCompass> {
-        let mut sum = NaturalRatio::zero();
-        for note in &notes {
-            sum += note.measure();
-        }
-
-        if sum == signature.ratio() {
-            Ok(Self { signature, notes, _private: () })
-        } else {
-            Err(InvalidCompass { expected: signature.ratio(), found: sum })
-        }
+    pub fn duration(&self) -> Duration {
+        Duration::from_raw_nanos(self.nanos().to_integer())
     }
 }

@@ -19,7 +19,7 @@ pub trait WaveBuilder {
 
     fn get_sample_rate(&self) -> u32;
 
-    fn finish(&mut self) -> Self::Wave;
+    fn finish(&self) -> Self::Wave;
 }
 
 impl<'builder, B> WaveBuilder for &'builder mut B
@@ -46,7 +46,7 @@ where
         (**self).get_sample_rate()
     }
 
-    fn finish(&mut self) -> Self::Wave {
+    fn finish(&self) -> Self::Wave {
         (**self).finish()
     }
 }
@@ -126,7 +126,7 @@ impl WaveBuilder for SineWaveBuilder {
         self.sample_rate
     }
 
-    fn finish(&mut self) -> Self::Wave {
+    fn finish(&self) -> Self::Wave {
         SineWave { freq: self.freq, index: 0 }
     }
 }
@@ -210,7 +210,7 @@ impl WaveBuilder for SawWaveBuilder {
         self.sample_rate
     }
 
-    fn finish(&mut self) -> Self::Wave {
+    fn finish(&self) -> Self::Wave {
         SawWave { freq: self.freq, index: 0.0 }
     }
 }
@@ -295,7 +295,7 @@ impl WaveBuilder for SquareWaveBuilder {
         self.sample_rate
     }
 
-    fn finish(&mut self) -> Self::Wave {
+    fn finish(&self) -> Self::Wave {
         SquareWave { freq: self.freq, index: 0.0 }
     }
 }
@@ -386,7 +386,7 @@ impl WaveBuilder for TriangleWaveBuilder {
         self.sample_rate
     }
 
-    fn finish(&mut self) -> Self::Wave {
+    fn finish(&self) -> Self::Wave {
         TriangleWave { freq: self.freq, index: 0.0 }
     }
 }
@@ -479,7 +479,7 @@ where
 #[derive(Debug, Clone)]
 pub struct RichWaveBuilder<B>
 where
-    B: WaveBuilder,
+    B: WaveBuilder + Clone,
 {
     depth: usize,
     dry: Real,
@@ -491,7 +491,7 @@ where
 
 impl<B> RichWaveBuilder<B>
 where
-    B: WaveBuilder,
+    B: WaveBuilder + Clone,
 {
     pub fn new(inner: B) -> Self {
         Self { inner, depth: 0, min: 0.0, max: 20000.0, dry: 0.9, wet: 0.01 }
@@ -545,7 +545,7 @@ where
 
 impl<B> WaveBuilder for RichWaveBuilder<B>
 where
-    B: WaveBuilder,
+    B: WaveBuilder + Clone,
 {
     type Wave = RichWave<B::Wave>;
 
@@ -567,14 +567,14 @@ where
         self.inner.get_sample_rate()
     }
 
-    fn finish(&mut self) -> Self::Wave {
+    fn finish(&self) -> Self::Wave {
         let wave = self.inner.finish();
         let mut helpers = Vec::with_capacity(self.depth);
 
         let leap = (self.max - self.min) / self.depth as Real;
         for i in 0 .. self.depth {
             let freq = self.min + i as Real * leap;
-            helpers.push(self.inner.freq(freq).finish());
+            helpers.push(self.inner.clone().freq(freq).finish());
         }
 
         RichWave { wave, helpers, dry: self.dry, wet: self.wet }
