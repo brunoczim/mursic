@@ -215,6 +215,182 @@ impl WaveBuilder for SawWaveBuilder {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct SquareWave {
+    index: Real,
+    freq: Real,
+}
+
+impl Iterator for SquareWave {
+    type Item = Real;
+
+    fn next(&mut self) -> Option<Real> {
+        let period = 48000.0 / self.freq;
+        if self.index > period {
+            self.index -= period;
+        } else {
+            self.index += 1.0;
+        }
+
+        let ratio = self.index / period;
+        let value = if ratio < 0.5 { 1.0 } else { -1.0 };
+        Some(value)
+    }
+}
+
+impl Source for SquareWave {
+    fn len(&self) -> Option<usize> {
+        None
+    }
+
+    fn duration(&self) -> Option<Duration> {
+        None
+    }
+
+    fn channels(&self) -> u16 {
+        1
+    }
+
+    fn sample_rate(&self) -> u32 {
+        48000
+    }
+}
+
+impl Wave for SquareWave {
+    fn freq(&self) -> Real {
+        self.freq
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SquareWaveBuilder {
+    freq: Real,
+    sample_rate: u32,
+}
+
+impl Default for SquareWaveBuilder {
+    fn default() -> Self {
+        Self { freq: 440.0, sample_rate: 48000 }
+    }
+}
+
+impl WaveBuilder for SquareWaveBuilder {
+    type Wave = SquareWave;
+
+    fn freq(&mut self, freq: Real) -> &mut Self {
+        self.freq = freq;
+        self
+    }
+
+    fn get_freq(&self) -> Real {
+        self.freq
+    }
+
+    fn sample_rate(&mut self, sample_rate: u32) -> &mut Self {
+        self.sample_rate = sample_rate;
+        self
+    }
+
+    fn get_sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    fn finish(&mut self) -> Self::Wave {
+        SquareWave { freq: self.freq, index: 0.0 }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TriangleWave {
+    index: Real,
+    freq: Real,
+}
+
+impl Iterator for TriangleWave {
+    type Item = Real;
+
+    fn next(&mut self) -> Option<Real> {
+        let period = 48000.0 / self.freq;
+        if self.index > period {
+            self.index -= period;
+        } else {
+            self.index += 1.0;
+        }
+
+        let ratio = self.index / period * 4.0;
+        let value = if ratio < 1.0 {
+            ratio
+        } else if ratio < 3.0 {
+            2.0 - ratio
+        } else {
+            ratio - 4.0
+        };
+        Some(value)
+    }
+}
+
+impl Source for TriangleWave {
+    fn len(&self) -> Option<usize> {
+        None
+    }
+
+    fn duration(&self) -> Option<Duration> {
+        None
+    }
+
+    fn channels(&self) -> u16 {
+        1
+    }
+
+    fn sample_rate(&self) -> u32 {
+        48000
+    }
+}
+
+impl Wave for TriangleWave {
+    fn freq(&self) -> Real {
+        self.freq
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TriangleWaveBuilder {
+    freq: Real,
+    sample_rate: u32,
+}
+
+impl Default for TriangleWaveBuilder {
+    fn default() -> Self {
+        Self { freq: 440.0, sample_rate: 48000 }
+    }
+}
+
+impl WaveBuilder for TriangleWaveBuilder {
+    type Wave = TriangleWave;
+
+    fn freq(&mut self, freq: Real) -> &mut Self {
+        self.freq = freq;
+        self
+    }
+
+    fn get_freq(&self) -> Real {
+        self.freq
+    }
+
+    fn sample_rate(&mut self, sample_rate: u32) -> &mut Self {
+        self.sample_rate = sample_rate;
+        self
+    }
+
+    fn get_sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    fn finish(&mut self) -> Self::Wave {
+        TriangleWave { freq: self.freq, index: 0.0 }
+    }
+}
+
 pub struct RichWave<W>
 where
     W: Wave,
