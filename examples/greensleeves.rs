@@ -32,8 +32,7 @@ fn main() {
         .note_value(NoteValue::Quarter)
         .dot(Dot::None)
         .note()
-        .compass()
-        .manner_kind(MannerKind::Plain);
+        .compass();
 
     make_chorus_intro(octave, &mut builder);
     make_mid(octave, &mut builder);
@@ -52,6 +51,7 @@ fn make_verse_intro(octave: u32, builder: &mut SongBuilder) {
     builder
         .pitch(Pitch { octave, key: Key::A })
         .note_value(NoteValue::Quarter)
+        .manner_kind(MannerKind::Plain)
         .dot(Dot::None)
         .note()
         .compass()
@@ -72,6 +72,7 @@ fn make_chorus_intro(octave: u32, builder: &mut SongBuilder) {
     builder
         .pitch(Pitch { octave: octave + 1, key: Key::G })
         .note_value(NoteValue::Half)
+        .manner_kind(MannerKind::Plain)
         .dot(Dot::Single)
         .note()
         .compass()
@@ -84,6 +85,7 @@ fn make_mid(octave: u32, builder: &mut SongBuilder) {
     builder
         .pitch(Pitch { octave: octave + 1, key: Key::F })
         .note_value(NoteValue::Eighth)
+        .manner_kind(MannerKind::Plain)
         .dot(Dot::None)
         .note()
         .pitch(Pitch { octave: octave + 1, key: Key::E })
@@ -114,6 +116,7 @@ fn make_first_outro(octave: u32, builder: &mut SongBuilder) {
     builder
         .pitch(Pitch { octave: octave + 1, key: Key::C })
         .note_value(NoteValue::Half)
+        .manner_kind(MannerKind::Plain)
         .dot(Dot::None)
         .note()
         .pitch(Pitch { octave, key: Key::A })
@@ -146,6 +149,7 @@ fn make_first_outro(octave: u32, builder: &mut SongBuilder) {
 fn make_second_outro(octave: u32, builder: &mut SongBuilder) {
     builder
         .pitch(Pitch { octave: octave + 1, key: Key::C })
+        .manner_kind(MannerKind::Plain)
         .note_value(NoteValue::Quarter)
         .dot(Dot::Single)
         .note()
@@ -170,7 +174,9 @@ fn make_second_outro(octave: u32, builder: &mut SongBuilder) {
         .compass()
         .pitch(Pitch { octave, key: Key::A })
         .note_value(NoteValue::Half)
-        .dot(Dot::Single)
+        .note()
+        .note_value(NoteValue::Quarter)
+        .manner_kind(MannerKind::Rest)
         .note()
         .compass();
 }
