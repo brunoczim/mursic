@@ -4,6 +4,7 @@ use crate::pitch::Pitch;
 pub enum MannerKind {
     Plain,
     Ligature,
+    Rest,
 }
 
 impl MannerKind {
@@ -11,6 +12,7 @@ impl MannerKind {
         match self {
             MannerKind::Plain => Manner::Plain(pitch),
             MannerKind::Ligature => Manner::Ligature,
+            MannerKind::Rest => Manner::Rest,
         }
     }
 }
@@ -19,6 +21,7 @@ impl MannerKind {
 pub enum Manner {
     Plain(Pitch),
     Ligature,
+    Rest,
 }
 
 impl Manner {
@@ -26,6 +29,7 @@ impl Manner {
         match self {
             Manner::Plain(_) => MannerKind::Plain,
             Manner::Ligature => MannerKind::Ligature,
+            Manner::Rest => MannerKind::Rest,
         }
     }
 }

@@ -73,3 +73,71 @@ where
         (**self).sample_rate()
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct Silence {
+    sample_rate: u32,
+    channels: u16,
+}
+
+impl Iterator for Silence {
+    type Item = Real;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(0.0)
+    }
+}
+
+impl Source for Silence {
+    fn len(&self) -> Option<usize> {
+        None
+    }
+
+    fn duration(&self) -> Option<Duration> {
+        None
+    }
+
+    fn channels(&self) -> u16 {
+        self.channels
+    }
+
+    fn sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SilenceBuilder {
+    sample_rate: u32,
+    channels: u16,
+}
+
+impl Default for SilenceBuilder {
+    fn default() -> Self {
+        Self { sample_rate: 48000, channels: 1 }
+    }
+}
+
+impl SilenceBuilder {
+    pub fn sample_rate(&mut self, sample_rate: u32) -> &mut Self {
+        self.sample_rate = sample_rate;
+        self
+    }
+
+    pub fn get_sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    pub fn channels(&mut self, channels: u16) -> &mut Self {
+        self.channels = channels;
+        self
+    }
+
+    pub fn get_channels(&self) -> u16 {
+        self.channels
+    }
+
+    pub fn finish(&self) -> Silence {
+        Silence { sample_rate: self.sample_rate, channels: self.channels }
+    }
+}

@@ -1,15 +1,14 @@
 use crate::{
     compass::{Compass, InvalidCompass, Note},
-    effects::TakeDuration,
     manner::{Manner, MannerKind},
     num::{DurationExt, Natural, NaturalRatio, Real},
     pitch::{Key, Pitch},
-    source::Source,
+    source::{SilenceBuilder, Source},
     tempo::{Dot, NoteTime, NoteValue, TimeSignature},
     wave::WaveBuilder,
 };
 use num::Zero;
-use std::{mem, time::Duration};
+use std::{fmt, mem, time::Duration};
 
 #[derive(Debug, Clone)]
 pub struct SongBuilder {
@@ -150,10 +149,16 @@ impl SongBuilder {
     }
 
     pub fn finish(&self) -> Song {
+        if self.notes.len() > 0 {
+            panic!("Notes left unincluded in any compass");
+        }
         Song { compasses: self.compasses.clone() }
     }
 
     pub fn clear_finish(&mut self) -> Song {
+        if self.notes.len() > 0 {
+            panic!("Notes left unincluded in any compass");
+        }
         Song { compasses: mem::replace(&mut self.compasses, Vec::new()) }
     }
 }
@@ -176,11 +181,12 @@ impl Song {
 #[derive(Debug, Clone)]
 pub struct PlayableSongBuilder {
     a5: Real,
+    start_compass: usize,
 }
 
 impl Default for PlayableSongBuilder {
     fn default() -> Self {
-        Self { a5: 440.0 }
+        Self { a5: 440.0, start_compass: 0 }
     }
 }
 
@@ -194,30 +200,40 @@ impl PlayableSongBuilder {
         self.a5
     }
 
+    pub fn start_compass(&mut self, start_compass: usize) -> &mut Self {
+        self.start_compass = start_compass;
+        self
+    }
+
+    pub fn get_start_compass(&self) -> usize {
+        self.start_compass
+    }
+
     pub fn finish<W>(&self, song: Song, instrument: W) -> PlayableSong<W>
     where
-        W: WaveBuilder,
+        W: WaveBuilder + Send + Sync,
+        W::Wave: 'static,
     {
         PlayableSong {
-            curr_wave: instrument
-                .finish()
-                .take_duration(Duration::from_secs(0)),
+            curr_wave: Box::new(
+                instrument.finish().take_duration(Duration::from_secs(0)),
+            ),
             a5: self.a5,
             instrument,
             remaining: song.nanos(),
             correction: NaturalRatio::zero(),
             song,
-            curr_compass: 0,
+            curr_compass: self.start_compass,
             curr_note: 0,
             curr_pitch: None,
         }
     }
 }
 
-#[derive(Debug, Clone)]
 pub struct PlayableSong<W>
 where
     W: WaveBuilder,
+    W::Wave: 'static,
 {
     a5: Real,
     instrument: W,
@@ -227,12 +243,32 @@ where
     curr_compass: usize,
     curr_note: usize,
     curr_pitch: Option<Pitch>,
-    curr_wave: TakeDuration<W::Wave>,
+    curr_wave: Box<dyn Source>,
+}
+
+impl<W> fmt::Debug for PlayableSong<W>
+where
+    W: WaveBuilder + Send + Sync + fmt::Debug,
+    W::Wave: 'static,
+{
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("PlayableSong")
+            .field("a5", &self.a5)
+            .field("instrument", &self.instrument)
+            .field("remaining", &self.remaining)
+            .field("correction", &self.correction)
+            .field("song", &self.song)
+            .field("curr_compass", &self.curr_compass)
+            .field("curr_note", &self.curr_note)
+            .field("curr_pitch", &self.curr_pitch)
+            .finish()
+    }
 }
 
 impl<W> Iterator for PlayableSong<W>
 where
-    W: WaveBuilder,
+    W: WaveBuilder + Send + Sync,
+    W::Wave: 'static,
 {
     type Item = f64;
 
@@ -259,12 +295,13 @@ where
             };
 
             let pitch = match note.pitch {
-                Manner::Plain(note) => note,
-                Manner::Ligature => {
-                    self.curr_pitch.expect("Cannot start song with ligature")
-                },
+                Manner::Plain(note) => Some(note),
+                Manner::Ligature => Some(
+                    self.curr_pitch.expect("Cannot start song with ligature"),
+                ),
+                Manner::Rest => None,
             };
-            self.curr_pitch = Some(pitch);
+            self.curr_pitch = pitch;
 
             let mut time = note.tempo.nanos().to_integer();
             self.correction += note.tempo.nanos().fract();
@@ -273,11 +310,21 @@ where
                 self.correction = self.correction.fract();
             }
 
-            self.curr_wave = self
-                .instrument
-                .freq(pitch.freq(self.a5))
-                .finish()
-                .take_duration(Duration::from_raw_nanos(time));
+            self.curr_wave = match pitch {
+                Some(pitch) => Box::new(
+                    self.instrument
+                        .freq(pitch.freq(self.a5))
+                        .finish()
+                        .take_duration(Duration::from_raw_nanos(time)),
+                ),
+
+                None => Box::new(
+                    SilenceBuilder::default()
+                        .sample_rate(self.sample_rate())
+                        .channels(self.channels())
+                        .finish(),
+                ),
+            };
 
             self.curr_note += 1;
         }
@@ -287,6 +334,7 @@ where
 impl<W> Source for PlayableSong<W>
 where
     W: WaveBuilder + Send + Sync,
+    W::Wave: 'static,
 {
     fn len(&self) -> Option<usize> {
         let nanos = self.song.nanos().to_integer();
