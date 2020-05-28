@@ -2,7 +2,7 @@ use crate::num::Real;
 use std::ops::Sub;
 
 pub fn note_ratio() -> Real {
-    Real::powf(1.0 / 2.0, 1.0 / 12.0)
+    Real::powf(2.0, 1.0 / 12.0)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

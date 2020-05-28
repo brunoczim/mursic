@@ -3,23 +3,42 @@ use mursic::{
     pitch::{Key, Pitch},
     player::Player,
     song::{PlayableSongBuilder, SongBuilder},
-    tempo::{NoteValue, TimeSignature},
+    tempo::{Dot, NoteValue, TimeSignature},
     wave::SquareWaveBuilder,
 };
 
 fn main() {
+    let octave = 4;
     let song = SongBuilder::default()
-        .bpm(NoteValue::Quarter, NaturalRatio::from(150))
+        .bpm(NoteValue::Quarter, NaturalRatio::from(120))
         .signature(TimeSignature { numer: 1, denom: NoteValue::Quarter })
-        .pitch(Pitch { octave: 3, key: Key::A })
+        .pitch(Pitch { octave, key: Key::A })
         .note()
         .compass()
         .signature(TimeSignature { numer: 3, denom: NoteValue::Quarter })
-        .pitch(Pitch { octave: 4, key: Key::C })
-        .tempo_note_value(NoteValue::Half)
+        .pitch(Pitch { octave: octave + 1, key: Key::C })
+        .note_value(NoteValue::Half)
         .note()
-        .pitch(Pitch { octave: 4, key: Key::D })
-        .tempo_note_value(NoteValue::Quarter)
+        .pitch(Pitch { octave: octave + 1, key: Key::D })
+        .note_value(NoteValue::Quarter)
+        .note()
+        .compass()
+        .pitch(Pitch { octave: octave + 1, key: Key::E })
+        .dot(Dot::Single)
+        .note()
+        .pitch(Pitch { octave: octave + 1, key: Key::F })
+        .note_value(NoteValue::Eighth)
+        .dot(Dot::None)
+        .note()
+        .pitch(Pitch { octave: octave + 1, key: Key::E })
+        .note_value(NoteValue::Quarter)
+        .note()
+        .compass()
+        .pitch(Pitch { octave: octave + 1, key: Key::D })
+        .note_value(NoteValue::Half)
+        .note()
+        .pitch(Pitch { octave, key: Key::B })
+        .note_value(NoteValue::Quarter)
         .note()
         .compass()
         .clear_finish();

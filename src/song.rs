@@ -16,8 +16,8 @@ pub struct SongBuilder {
     signature: TimeSignature,
     bpm: NaturalRatio,
     tuplet: u32,
-    tempo_note_value: NoteValue,
-    tempo_dot: Dot,
+    note_value: NoteValue,
+    dot: Dot,
     pitch: Pitch,
     manner_kind: MannerKind,
     notes: Vec<Note>,
@@ -30,8 +30,8 @@ impl Default for SongBuilder {
             signature: TimeSignature { numer: 4, denom: NoteValue::Quarter },
             bpm: NaturalRatio::from(120),
             tuplet: 2,
-            tempo_note_value: NoteValue::Quarter,
-            tempo_dot: Dot::None,
+            note_value: NoteValue::Quarter,
+            dot: Dot::None,
             pitch: Pitch { key: Key::A, octave: 5 },
             manner_kind: MannerKind::Plain,
             notes: Vec::new(),
@@ -52,10 +52,10 @@ impl SongBuilder {
 
     pub fn bpm(
         &mut self,
-        tempo_note_value: NoteValue,
+        note_value: NoteValue,
         bpm: NaturalRatio,
     ) -> &mut Self {
-        self.bpm = bpm / Natural::from(tempo_note_value as u32 as Natural);
+        self.bpm = bpm / Natural::from(note_value as u32 as Natural);
         self
     }
 
@@ -72,25 +72,22 @@ impl SongBuilder {
         self.tuplet
     }
 
-    pub fn tempo_note_value(
-        &mut self,
-        tempo_note_value: NoteValue,
-    ) -> &mut Self {
-        self.tempo_note_value = tempo_note_value;
+    pub fn note_value(&mut self, note_value: NoteValue) -> &mut Self {
+        self.note_value = note_value;
         self
     }
 
-    pub fn get_tempo_note_value(&self) -> NoteValue {
-        self.tempo_note_value
+    pub fn get_note_value(&self) -> NoteValue {
+        self.note_value
     }
 
-    pub fn tempo_dot(&mut self, tempo_dot: Dot) -> &mut Self {
-        self.tempo_dot = tempo_dot;
+    pub fn dot(&mut self, dot: Dot) -> &mut Self {
+        self.dot = dot;
         self
     }
 
-    pub fn get_tempo_dot(&self) -> Dot {
-        self.tempo_dot
+    pub fn get_dot(&self) -> Dot {
+        self.dot
     }
 
     pub fn pitch(&mut self, pitch: Pitch) -> &mut Self {
@@ -121,8 +118,8 @@ impl SongBuilder {
             tempo: NoteTime {
                 whole_bpm: self.bpm,
                 tuplet: self.tuplet,
-                dot: self.tempo_dot,
-                note_value: self.tempo_note_value,
+                dot: self.dot,
+                note_value: self.note_value,
             },
         };
         let sum = self
