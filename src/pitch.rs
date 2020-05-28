@@ -7,7 +7,7 @@ pub fn note_ratio() -> Real {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u8)]
-pub enum Semitone {
+pub enum Key {
     C = 0,
     Cs = 1,
     D = 2,
@@ -22,38 +22,38 @@ pub enum Semitone {
     B = 11,
 }
 
-impl Semitone {
+impl Key {
     pub const TOTAL: usize = 12;
 
     #[allow(non_upper_case_globals)]
-    pub const Db: Self = Semitone::Cs;
+    pub const Db: Self = Key::Cs;
 
     #[allow(non_upper_case_globals)]
-    pub const Eb: Self = Semitone::Ds;
+    pub const Eb: Self = Key::Ds;
 
     #[allow(non_upper_case_globals)]
-    pub const Fb: Self = Semitone::E;
+    pub const Fb: Self = Key::E;
 
     #[allow(non_upper_case_globals)]
-    pub const Es: Self = Semitone::F;
+    pub const Es: Self = Key::F;
 
     #[allow(non_upper_case_globals)]
-    pub const Gb: Self = Semitone::Fs;
+    pub const Gb: Self = Key::Fs;
 
     #[allow(non_upper_case_globals)]
-    pub const Ab: Self = Semitone::Gs;
+    pub const Ab: Self = Key::Gs;
 
     #[allow(non_upper_case_globals)]
-    pub const Bb: Self = Semitone::As;
+    pub const Bb: Self = Key::As;
 
     #[allow(non_upper_case_globals)]
-    pub const Cb: Self = Semitone::B;
+    pub const Cb: Self = Key::B;
 
     #[allow(non_upper_case_globals)]
-    pub const Bs: Self = Semitone::C;
+    pub const Bs: Self = Key::C;
 }
 
-impl Sub for Semitone {
+impl Sub for Key {
     type Output = i8;
 
     fn sub(self, other: Self) -> Self::Output {
@@ -62,34 +62,28 @@ impl Sub for Semitone {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct HardNote {
-    pub note: Semitone,
+pub struct Pitch {
+    pub key: Key,
     pub octave: u32,
 }
 
-impl HardNote {
+impl Pitch {
     pub fn freq(self, a5: Real) -> Real {
-        let a5_note = HardNote { note: Semitone::A, octave: 5 };
+        let a5_note = Pitch { key: Key::A, octave: 5 };
         let octaves = self.octave as i32 - a5_note.octave as i32;
-        let notes = (self.note - a5_note.note) as i32;
+        let notes = (self.key - a5_note.key) as i32;
 
         a5 * Real::powi(2.0, octaves) * note_ratio().powi(notes)
     }
 }
 
-impl Sub for HardNote {
+impl Sub for Pitch {
     type Output = i32;
 
     fn sub(self, other: Self) -> Self::Output {
-        let total = Semitone::TOTAL as i32;
+        let total = Key::TOTAL as i32;
         let octave = self.octave as i32 - other.octave as i32;
-        let note = (self.note - other.note) as i32;
+        let note = (self.key - other.key) as i32;
         octave * total + note
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Note {
-    Hard(HardNote),
-    Ligature,
 }

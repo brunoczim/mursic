@@ -1,10 +1,11 @@
 use crate::{
-    compass::{Compass, CompassBuilder, InvalidCompass},
+    compass::{Compass, InvalidCompass, Note},
     effects::TakeDuration,
+    manner::{Manner, MannerKind},
     num::{DurationExt, Natural, NaturalRatio, Real},
+    pitch::{Key, Pitch},
     source::Source,
-    tempo,
-    tone,
+    tempo::{Dot, NoteTime, NoteValue, TimeSignature},
     wave::WaveBuilder,
 };
 use num::Zero;
@@ -12,57 +13,151 @@ use std::{mem, time::Duration};
 
 #[derive(Debug, Clone)]
 pub struct SongBuilder {
-    song: Song,
-    curr_bpm: NaturalRatio,
-    curr_tuplet: u32,
-    curr_sig: tempo::Signature,
+    signature: TimeSignature,
+    bpm: NaturalRatio,
+    tuplet: u32,
+    tempo_note_value: NoteValue,
+    tempo_dot: Dot,
+    pitch: Pitch,
+    manner_kind: MannerKind,
+    notes: Vec<Note>,
+    compasses: Vec<Compass>,
 }
 
 impl Default for SongBuilder {
     fn default() -> Self {
         Self {
-            song: Song { compasses: Vec::new() },
-            curr_bpm: NaturalRatio::from(120),
-            curr_tuplet: 2,
-            curr_sig: tempo::Signature {
-                numer: 4,
-                denom: tempo::Base::Quarter,
-            },
+            signature: TimeSignature { numer: 4, denom: NoteValue::Quarter },
+            bpm: NaturalRatio::from(120),
+            tuplet: 2,
+            tempo_note_value: NoteValue::Quarter,
+            tempo_dot: Dot::None,
+            pitch: Pitch { key: Key::A, octave: 5 },
+            manner_kind: MannerKind::Plain,
+            notes: Vec::new(),
+            compasses: Vec::new(),
         }
     }
 }
 
 impl SongBuilder {
-    pub fn with_compass<F>(
+    pub fn signature(&mut self, signature: TimeSignature) -> &mut Self {
+        self.signature = signature;
+        self
+    }
+
+    pub fn get_signature(&self) -> TimeSignature {
+        self.signature
+    }
+
+    pub fn bpm(
         &mut self,
-        func: F,
-    ) -> Result<&mut Self, InvalidCompass>
-    where
-        F: FnOnce(&mut CompassBuilder) -> Result<(), InvalidCompass>,
-    {
-        let mut builder = CompassBuilder::default();
-        func(
-            builder
-                .curr_bpm(tempo::Base::Whole, self.curr_bpm)
-                .curr_tuplet(self.curr_tuplet)
-                .signature(self.curr_sig),
+        tempo_note_value: NoteValue,
+        bpm: NaturalRatio,
+    ) -> &mut Self {
+        self.bpm = bpm / Natural::from(tempo_note_value as u32 as Natural);
+        self
+    }
+
+    pub fn get_bpm(&self) -> NaturalRatio {
+        self.bpm
+    }
+
+    pub fn tuplet(&mut self, tuplet: u32) -> &mut Self {
+        self.tuplet = tuplet;
+        self
+    }
+
+    pub fn get_tuplet(&self) -> u32 {
+        self.tuplet
+    }
+
+    pub fn tempo_note_value(
+        &mut self,
+        tempo_note_value: NoteValue,
+    ) -> &mut Self {
+        self.tempo_note_value = tempo_note_value;
+        self
+    }
+
+    pub fn get_tempo_note_value(&self) -> NoteValue {
+        self.tempo_note_value
+    }
+
+    pub fn tempo_dot(&mut self, tempo_dot: Dot) -> &mut Self {
+        self.tempo_dot = tempo_dot;
+        self
+    }
+
+    pub fn get_tempo_dot(&self) -> Dot {
+        self.tempo_dot
+    }
+
+    pub fn pitch(&mut self, pitch: Pitch) -> &mut Self {
+        self.pitch = pitch;
+        self
+    }
+
+    pub fn get_pitch(&self) -> Pitch {
+        self.pitch
+    }
+
+    pub fn manner_kind(&mut self, manner_kind: MannerKind) -> &mut Self {
+        self.manner_kind = manner_kind;
+        self
+    }
+
+    pub fn get_manner_kind(&self) -> MannerKind {
+        self.manner_kind
+    }
+
+    pub fn note(&mut self) -> &mut Self {
+        self.try_note().expect("Error creating note")
+    }
+
+    pub fn try_note(&mut self) -> Result<&mut Self, InvalidCompass> {
+        let note = Note {
+            pitch: self.manner_kind.make_note(self.pitch),
+            tempo: NoteTime {
+                whole_bpm: self.bpm,
+                tuplet: self.tuplet,
+                dot: self.tempo_dot,
+                note_value: self.tempo_note_value,
+            },
+        };
+        let sum = self
+            .notes
+            .iter()
+            .map(|note| note.tempo.measure())
+            .sum::<NaturalRatio>()
+            + note.tempo.measure();
+
+        if sum <= self.signature.ratio() {
+            self.notes.push(note);
+            Ok(self)
+        } else {
+            Err(InvalidCompass { expected: self.signature.ratio(), found: sum })
+        }
+    }
+
+    pub fn compass(&mut self) -> &mut Self {
+        self.try_compass().expect("Error creating compass")
+    }
+    pub fn try_compass(&mut self) -> Result<&mut Self, InvalidCompass> {
+        let compass = Compass::new(
+            self.signature,
+            mem::replace(&mut self.notes, Vec::new()),
         )?;
-
-        self.song.compasses.push(builder.clear_finish()?);
-
-        self.curr_bpm = builder.get_curr_bpm();
-        self.curr_tuplet = builder.get_curr_tuplet();
-        self.curr_sig = builder.get_signature();
-
+        self.compasses.push(compass);
         Ok(self)
     }
 
     pub fn finish(&self) -> Song {
-        self.song.clone()
+        Song { compasses: self.compasses.clone() }
     }
 
     pub fn clear_finish(&mut self) -> Song {
-        mem::replace(&mut self.song, Song { compasses: Vec::new() })
+        Song { compasses: mem::replace(&mut self.compasses, Vec::new()) }
     }
 }
 
@@ -84,6 +179,12 @@ impl Song {
 #[derive(Debug, Clone)]
 pub struct PlayableSongBuilder {
     a5: Real,
+}
+
+impl Default for PlayableSongBuilder {
+    fn default() -> Self {
+        Self { a5: 440.0 }
+    }
 }
 
 impl PlayableSongBuilder {
@@ -111,7 +212,7 @@ impl PlayableSongBuilder {
             song,
             curr_compass: 0,
             curr_note: 0,
-            curr_hard_note: None,
+            curr_pitch: None,
         }
     }
 }
@@ -128,7 +229,7 @@ where
     song: Song,
     curr_compass: usize,
     curr_note: usize,
-    curr_hard_note: Option<tone::HardNote>,
+    curr_pitch: Option<Pitch>,
     curr_wave: TakeDuration<W::Wave>,
 }
 
@@ -160,13 +261,13 @@ where
                 }
             };
 
-            let tone_hard_note = match note.tone {
-                tone::Note::Hard(note) => note,
-                tone::Note::Ligature => self
-                    .curr_hard_note
-                    .expect("Cannot start song with ligature"),
+            let pitch = match note.pitch {
+                Manner::Plain(note) => note,
+                Manner::Ligature => {
+                    self.curr_pitch.expect("Cannot start song with ligature")
+                },
             };
-            self.curr_hard_note = Some(tone_hard_note);
+            self.curr_pitch = Some(pitch);
 
             let mut time = note.tempo.nanos().to_integer();
             self.correction += note.tempo.nanos().fract();
@@ -177,7 +278,7 @@ where
 
             self.curr_wave = self
                 .instrument
-                .freq(tone_hard_note.freq(self.a5))
+                .freq(pitch.freq(self.a5))
                 .finish()
                 .take_duration(Duration::from_raw_nanos(time));
 

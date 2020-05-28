@@ -3,7 +3,7 @@ use std::time::Duration;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u32)]
-pub enum Base {
+pub enum NoteValue {
     Whole = 1,
     Half = 2,
     Quarter = 4,
@@ -13,7 +13,7 @@ pub enum Base {
     SixtyForth = 64,
 }
 
-impl Base {
+impl NoteValue {
     pub fn numeric(&self) -> u32 {
         *self as u32
     }
@@ -29,18 +29,18 @@ pub enum Dot {
 
 impl Dot {
     pub fn numeric(&self) -> NaturalRatio {
-        let base = Natural::from(*self as u32);
-        NaturalRatio::new(base * 2 - 1, base)
+        let note_value = Natural::from(*self as u32);
+        NaturalRatio::new(note_value * 2 - 1, note_value)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Signature {
+pub struct TimeSignature {
     pub numer: u32,
-    pub denom: Base,
+    pub denom: NoteValue,
 }
 
-impl Signature {
+impl TimeSignature {
     pub fn ratio(&self) -> NaturalRatio {
         NaturalRatio::new(
             Natural::from(self.numer),
@@ -50,18 +50,18 @@ impl Signature {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Note {
-    pub base: Base,
+pub struct NoteTime {
+    pub note_value: NoteValue,
     pub dot: Dot,
     pub tuplet: u32,
     pub whole_bpm: NaturalRatio,
 }
 
-impl Note {
+impl NoteTime {
     pub fn measure(&self) -> NaturalRatio {
         let dividend = self.dot.numeric();
         let divisor = NaturalRatio::new(
-            Natural::from(self.base.numeric()) * 2,
+            Natural::from(self.note_value.numeric()) * 2,
             Natural::from(self.tuplet),
         );
         dividend / divisor
@@ -71,7 +71,7 @@ impl Note {
         let dividend =
             NaturalRatio::from(60) / self.whole_bpm * self.dot.numeric();
         let divisor = NaturalRatio::new(
-            Natural::from(self.base.numeric()) * 2,
+            Natural::from(self.note_value.numeric()) * 2,
             Natural::from(self.tuplet),
         );
         let secs = dividend / divisor;
