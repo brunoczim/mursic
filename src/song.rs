@@ -310,19 +310,22 @@ where
                 self.correction = self.correction.fract();
             }
 
+            let duration = Duration::from_raw_nanos(time);
+
             self.curr_wave = match pitch {
                 Some(pitch) => Box::new(
                     self.instrument
                         .freq(pitch.freq(self.a5))
                         .finish()
-                        .take_duration(Duration::from_raw_nanos(time)),
+                        .take_duration(duration),
                 ),
 
                 None => Box::new(
                     SilenceBuilder::default()
                         .sample_rate(self.sample_rate())
                         .channels(self.channels())
-                        .finish(),
+                        .finish()
+                        .take_duration(duration),
                 ),
             };
 
