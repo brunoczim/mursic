@@ -5,6 +5,6 @@ pub mod wave;
 pub mod effects;
 pub mod tempo;
 pub mod pitch;
-pub mod manner;
+pub mod note;
 pub mod compass;
 pub mod song;

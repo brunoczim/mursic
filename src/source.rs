@@ -74,6 +74,54 @@ where
     }
 }
 
+pub trait SourceBuilder {
+    type Source: Source;
+
+    fn get_channels(&self) -> u16;
+
+    fn get_sample_rate(&self) -> u32;
+
+    fn finish(&self) -> Self::Source;
+}
+
+impl<'builder, B> SourceBuilder for &'builder mut B
+where
+    B: SourceBuilder,
+{
+    type Source = B::Source;
+
+    fn get_channels(&self) -> u16 {
+        (**self).get_channels()
+    }
+
+    fn get_sample_rate(&self) -> u32 {
+        (**self).get_sample_rate()
+    }
+
+    fn finish(&self) -> Self::Source {
+        (**self).finish()
+    }
+}
+
+impl<B> SourceBuilder for Box<B>
+where
+    B: SourceBuilder + ?Sized,
+{
+    type Source = B::Source;
+
+    fn get_channels(&self) -> u16 {
+        (**self).get_channels()
+    }
+
+    fn get_sample_rate(&self) -> u32 {
+        (**self).get_sample_rate()
+    }
+
+    fn finish(&self) -> Self::Source {
+        (**self).finish()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Silence {
     sample_rate: u32,
@@ -124,20 +172,24 @@ impl SilenceBuilder {
         self
     }
 
-    pub fn get_sample_rate(&self) -> u32 {
-        self.sample_rate
-    }
-
     pub fn channels(&mut self, channels: u16) -> &mut Self {
         self.channels = channels;
         self
     }
+}
 
-    pub fn get_channels(&self) -> u16 {
+impl SourceBuilder for SilenceBuilder {
+    type Source = Silence;
+
+    fn get_sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    fn get_channels(&self) -> u16 {
         self.channels
     }
 
-    pub fn finish(&self) -> Silence {
+    fn finish(&self) -> Self::Source {
         Silence { sample_rate: self.sample_rate, channels: self.channels }
     }
 }

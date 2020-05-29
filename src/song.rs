@@ -1,14 +1,14 @@
 use crate::{
-    compass::{Compass, InvalidCompass, Note},
-    manner::{Manner, MannerKind},
+    compass::{Compass, InvalidCompass},
+    note::{Note, NoteGroup, NoteKind},
     num::{DurationExt, Natural, NaturalRatio, Real},
     pitch::{Key, Pitch},
-    source::{SilenceBuilder, Source},
+    source::{SilenceBuilder, Source, SourceBuilder},
     tempo::{Dot, NoteTime, NoteValue, TimeSignature},
-    wave::WaveBuilder,
+    wave::{Wave, WaveBuilder},
 };
 use num::Zero;
-use std::{fmt, mem, time::Duration};
+use std::{collections::BTreeSet, fmt, mem, time::Duration};
 
 #[derive(Debug, Clone)]
 pub struct SongBuilder {
@@ -18,8 +18,9 @@ pub struct SongBuilder {
     note_value: NoteValue,
     dot: Dot,
     pitch: Pitch,
-    manner_kind: MannerKind,
-    notes: Vec<Note>,
+    note_kind: NoteKind,
+    notes: BTreeSet<Note>,
+    note_groups: Vec<NoteGroup>,
     compasses: Vec<Compass>,
 }
 
@@ -32,8 +33,9 @@ impl Default for SongBuilder {
             note_value: NoteValue::Quarter,
             dot: Dot::None,
             pitch: Pitch { key: Key::A, octave: 5 },
-            manner_kind: MannerKind::Plain,
-            notes: Vec::new(),
+            note_kind: NoteKind::Plain,
+            notes: BTreeSet::new(),
+            note_groups: Vec::new(),
             compasses: Vec::new(),
         }
     }
@@ -98,22 +100,27 @@ impl SongBuilder {
         self.pitch
     }
 
-    pub fn manner_kind(&mut self, manner_kind: MannerKind) -> &mut Self {
-        self.manner_kind = manner_kind;
+    pub fn note_kind(&mut self, note_kind: NoteKind) -> &mut Self {
+        self.note_kind = note_kind;
         self
     }
 
-    pub fn get_manner_kind(&self) -> MannerKind {
-        self.manner_kind
+    pub fn get_note_kind(&self) -> NoteKind {
+        self.note_kind
     }
 
     pub fn note(&mut self) -> &mut Self {
-        self.try_note().expect("Error creating note")
+        self.notes.insert(Note { pitch: self.pitch, kind: self.note_kind });
+        self
     }
 
-    pub fn try_note(&mut self) -> Result<&mut Self, InvalidCompass> {
-        let note = Note {
-            pitch: self.manner_kind.make_note(self.pitch),
+    pub fn note_group(&mut self) -> &mut Self {
+        self.try_note_group().expect("Error creating note")
+    }
+
+    pub fn try_note_group(&mut self) -> Result<&mut Self, InvalidCompass> {
+        let group = NoteGroup {
+            notes: mem::replace(&mut self.notes, BTreeSet::new()),
             tempo: NoteTime {
                 whole_bpm: self.bpm,
                 tuplet: self.tuplet,
@@ -122,14 +129,14 @@ impl SongBuilder {
             },
         };
         let sum = self
-            .notes
+            .note_groups
             .iter()
-            .map(|note| note.tempo.measure())
+            .map(|group| group.tempo.measure())
             .sum::<NaturalRatio>()
-            + note.tempo.measure();
+            + group.tempo.measure();
 
         if sum <= self.signature.ratio() {
-            self.notes.push(note);
+            self.note_groups.push(group);
             Ok(self)
         } else {
             Err(InvalidCompass { expected: self.signature.ratio(), found: sum })
@@ -139,10 +146,11 @@ impl SongBuilder {
     pub fn compass(&mut self) -> &mut Self {
         self.try_compass().expect("Error creating compass")
     }
+
     pub fn try_compass(&mut self) -> Result<&mut Self, InvalidCompass> {
         let compass = Compass::new(
             self.signature,
-            mem::replace(&mut self.notes, Vec::new()),
+            mem::replace(&mut self.note_groups, Vec::new()),
         )?;
         self.compasses.push(compass);
         Ok(self)
@@ -212,7 +220,7 @@ impl PlayableSongBuilder {
     pub fn finish<W>(&self, song: Song, instrument: W) -> PlayableSong<W>
     where
         W: WaveBuilder + Send + Sync,
-        W::Wave: 'static,
+        W::Source: Wave + 'static,
     {
         PlayableSong {
             curr_wave: Box::new(
@@ -232,8 +240,8 @@ impl PlayableSongBuilder {
 
 pub struct PlayableSong<W>
 where
-    W: WaveBuilder,
-    W::Wave: 'static,
+    W: WaveBuilder + Send + Sync,
+    W::Source: Wave + 'static,
 {
     a5: Real,
     instrument: W,
@@ -246,10 +254,17 @@ where
     curr_wave: Box<dyn Source>,
 }
 
+impl<W> PlayableSong<W>
+where
+    W: WaveBuilder + Send + Sync,
+    W::Source: Wave + 'static,
+{
+}
+
 impl<W> fmt::Debug for PlayableSong<W>
 where
     W: WaveBuilder + Send + Sync + fmt::Debug,
-    W::Wave: 'static,
+    W::Source: Wave + 'static,
 {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("PlayableSong")
@@ -268,7 +283,7 @@ where
 impl<W> Iterator for PlayableSong<W>
 where
     W: WaveBuilder + Send + Sync,
-    W::Wave: 'static,
+    W::Source: Wave + 'static,
 {
     type Item = f64;
 
@@ -283,7 +298,7 @@ where
                     .song
                     .compasses
                     .get(self.curr_compass)?
-                    .notes
+                    .note_groups
                     .get(self.curr_note)
                 {
                     Some(note) => break note,
@@ -337,7 +352,7 @@ where
 impl<W> Source for PlayableSong<W>
 where
     W: WaveBuilder + Send + Sync,
-    W::Wave: 'static,
+    W::Source: Wave + 'static,
 {
     fn len(&self) -> Option<usize> {
         let nanos = self.song.nanos().to_integer();
@@ -354,6 +369,6 @@ where
     }
 
     fn channels(&self) -> u16 {
-        self.curr_wave.channels()
+        self.instrument.get_channels()
     }
 }

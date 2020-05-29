@@ -1,6 +1,6 @@
 use crate::{
     num::{real::consts::PI, Real},
-    source::Source,
+    source::{Source, SourceBuilder},
 };
 use std::time::Duration;
 
@@ -8,26 +8,23 @@ pub trait Wave: Source {
     fn freq(&self) -> Real;
 }
 
-pub trait WaveBuilder {
-    type Wave: Wave;
-
+pub trait WaveBuilder
+where
+    Self: SourceBuilder,
+    Self::Source: Wave,
+{
     fn freq(&mut self, freq: Real) -> &mut Self;
 
     fn get_freq(&self) -> Real;
 
     fn sample_rate(&mut self, rate: u32) -> &mut Self;
-
-    fn get_sample_rate(&self) -> u32;
-
-    fn finish(&self) -> Self::Wave;
 }
 
 impl<'builder, B> WaveBuilder for &'builder mut B
 where
     B: WaveBuilder,
+    B::Source: Wave,
 {
-    type Wave = B::Wave;
-
     fn freq(&mut self, freq: Real) -> &mut Self {
         (**self).freq(freq);
         self
@@ -41,13 +38,25 @@ where
         (**self).sample_rate(rate);
         self
     }
+}
 
-    fn get_sample_rate(&self) -> u32 {
-        (**self).get_sample_rate()
+impl<B> WaveBuilder for Box<B>
+where
+    B: WaveBuilder + ?Sized,
+    B::Source: Wave,
+{
+    fn freq(&mut self, freq: Real) -> &mut Self {
+        (**self).freq(freq);
+        self
     }
 
-    fn finish(&self) -> Self::Wave {
-        (**self).finish()
+    fn get_freq(&self) -> Real {
+        (**self).get_freq()
+    }
+
+    fn sample_rate(&mut self, rate: u32) -> &mut Self {
+        (**self).sample_rate(rate);
+        self
     }
 }
 
@@ -105,9 +114,23 @@ impl Default for SineWaveBuilder {
     }
 }
 
-impl WaveBuilder for SineWaveBuilder {
-    type Wave = SineWave;
+impl SourceBuilder for SineWaveBuilder {
+    type Source = SineWave;
 
+    fn get_channels(&self) -> u16 {
+        1
+    }
+
+    fn get_sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    fn finish(&self) -> Self::Source {
+        SineWave { freq: self.freq, index: 0 }
+    }
+}
+
+impl WaveBuilder for SineWaveBuilder {
     fn freq(&mut self, freq: Real) -> &mut Self {
         self.freq = freq;
         self
@@ -120,14 +143,6 @@ impl WaveBuilder for SineWaveBuilder {
     fn sample_rate(&mut self, sample_rate: u32) -> &mut Self {
         self.sample_rate = sample_rate;
         self
-    }
-
-    fn get_sample_rate(&self) -> u32 {
-        self.sample_rate
-    }
-
-    fn finish(&self) -> Self::Wave {
-        SineWave { freq: self.freq, index: 0 }
     }
 }
 
@@ -189,9 +204,23 @@ impl Default for SawWaveBuilder {
     }
 }
 
-impl WaveBuilder for SawWaveBuilder {
-    type Wave = SawWave;
+impl SourceBuilder for SawWaveBuilder {
+    type Source = SawWave;
 
+    fn get_channels(&self) -> u16 {
+        1
+    }
+
+    fn get_sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    fn finish(&self) -> Self::Source {
+        SawWave { freq: self.freq, index: 0.0 }
+    }
+}
+
+impl WaveBuilder for SawWaveBuilder {
     fn freq(&mut self, freq: Real) -> &mut Self {
         self.freq = freq;
         self
@@ -204,14 +233,6 @@ impl WaveBuilder for SawWaveBuilder {
     fn sample_rate(&mut self, sample_rate: u32) -> &mut Self {
         self.sample_rate = sample_rate;
         self
-    }
-
-    fn get_sample_rate(&self) -> u32 {
-        self.sample_rate
-    }
-
-    fn finish(&self) -> Self::Wave {
-        SawWave { freq: self.freq, index: 0.0 }
     }
 }
 
@@ -274,9 +295,23 @@ impl Default for SquareWaveBuilder {
     }
 }
 
-impl WaveBuilder for SquareWaveBuilder {
-    type Wave = SquareWave;
+impl SourceBuilder for SquareWaveBuilder {
+    type Source = SquareWave;
 
+    fn get_channels(&self) -> u16 {
+        1
+    }
+
+    fn get_sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    fn finish(&self) -> Self::Source {
+        SquareWave { freq: self.freq, index: 0.0 }
+    }
+}
+
+impl WaveBuilder for SquareWaveBuilder {
     fn freq(&mut self, freq: Real) -> &mut Self {
         self.freq = freq;
         self
@@ -289,14 +324,6 @@ impl WaveBuilder for SquareWaveBuilder {
     fn sample_rate(&mut self, sample_rate: u32) -> &mut Self {
         self.sample_rate = sample_rate;
         self
-    }
-
-    fn get_sample_rate(&self) -> u32 {
-        self.sample_rate
-    }
-
-    fn finish(&self) -> Self::Wave {
-        SquareWave { freq: self.freq, index: 0.0 }
     }
 }
 
@@ -365,9 +392,23 @@ impl Default for TriangleWaveBuilder {
     }
 }
 
-impl WaveBuilder for TriangleWaveBuilder {
-    type Wave = TriangleWave;
+impl SourceBuilder for TriangleWaveBuilder {
+    type Source = TriangleWave;
 
+    fn get_channels(&self) -> u16 {
+        1
+    }
+
+    fn get_sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    fn finish(&self) -> Self::Source {
+        TriangleWave { freq: self.freq, index: 0.0 }
+    }
+}
+
+impl WaveBuilder for TriangleWaveBuilder {
     fn freq(&mut self, freq: Real) -> &mut Self {
         self.freq = freq;
         self
@@ -380,14 +421,6 @@ impl WaveBuilder for TriangleWaveBuilder {
     fn sample_rate(&mut self, sample_rate: u32) -> &mut Self {
         self.sample_rate = sample_rate;
         self
-    }
-
-    fn get_sample_rate(&self) -> u32 {
-        self.sample_rate
-    }
-
-    fn finish(&self) -> Self::Wave {
-        TriangleWave { freq: self.freq, index: 0.0 }
     }
 }
 
@@ -480,6 +513,7 @@ where
 pub struct RichWaveBuilder<B>
 where
     B: WaveBuilder + Clone,
+    B::Source: Wave,
 {
     depth: usize,
     dry: Real,
@@ -492,6 +526,7 @@ where
 impl<B> RichWaveBuilder<B>
 where
     B: WaveBuilder + Clone,
+    B::Source: Wave,
 {
     pub fn new(inner: B) -> Self {
         Self { inner, depth: 0, min: 0.0, max: 20000.0, dry: 0.9, wet: 0.01 }
@@ -543,12 +578,40 @@ where
     }
 }
 
+impl<B> SourceBuilder for RichWaveBuilder<B>
+where
+    B: WaveBuilder + Clone,
+    B::Source: Wave,
+{
+    type Source = RichWave<B::Source>;
+
+    fn get_channels(&self) -> u16 {
+        self.inner.get_channels()
+    }
+
+    fn get_sample_rate(&self) -> u32 {
+        self.inner.get_sample_rate()
+    }
+
+    fn finish(&self) -> Self::Source {
+        let wave = self.inner.finish();
+        let mut helpers = Vec::with_capacity(self.depth);
+
+        let leap = (self.max - self.min) / self.depth as Real;
+        for i in 0 .. self.depth {
+            let freq = self.min + i as Real * leap;
+            helpers.push(self.inner.clone().freq(freq).finish());
+        }
+
+        RichWave { wave, helpers, dry: self.dry, wet: self.wet }
+    }
+}
+
 impl<B> WaveBuilder for RichWaveBuilder<B>
 where
     B: WaveBuilder + Clone,
+    B::Source: Wave,
 {
-    type Wave = RichWave<B::Wave>;
-
     fn freq(&mut self, freq: Real) -> &mut Self {
         self.inner.freq(freq);
         self
@@ -561,22 +624,5 @@ where
     fn sample_rate(&mut self, sample_rate: u32) -> &mut Self {
         self.inner.sample_rate(sample_rate);
         self
-    }
-
-    fn get_sample_rate(&self) -> u32 {
-        self.inner.get_sample_rate()
-    }
-
-    fn finish(&self) -> Self::Wave {
-        let wave = self.inner.finish();
-        let mut helpers = Vec::with_capacity(self.depth);
-
-        let leap = (self.max - self.min) / self.depth as Real;
-        for i in 0 .. self.depth {
-            let freq = self.min + i as Real * leap;
-            helpers.push(self.inner.clone().freq(freq).finish());
-        }
-
-        RichWave { wave, helpers, dry: self.dry, wet: self.wet }
     }
 }

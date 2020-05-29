@@ -1,15 +1,9 @@
 use crate::{
-    manner::Manner,
+    note::NoteGroup,
     num::{DurationExt, NaturalRatio},
-    tempo::{NoteTime, TimeSignature},
+    tempo::TimeSignature,
 };
 use std::{error::Error, fmt, time::Duration};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Note {
-    pub tempo: NoteTime,
-    pub pitch: Manner,
-}
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct InvalidCompass {
@@ -32,26 +26,26 @@ impl Error for InvalidCompass {}
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Compass {
     pub signature: TimeSignature,
-    pub notes: Vec<Note>,
+    pub note_groups: Vec<NoteGroup>,
     _private: (),
 }
 
 impl Compass {
     pub fn new(
         signature: TimeSignature,
-        notes: Vec<Note>,
+        note_groups: Vec<NoteGroup>,
     ) -> Result<Self, InvalidCompass> {
-        let sum = notes.iter().map(|note| note.tempo.measure()).sum();
+        let sum = note_groups.iter().map(|group| group.tempo.measure()).sum();
 
         if sum == signature.ratio() {
-            Ok(Self { signature, notes, _private: () })
+            Ok(Self { signature, note_groups, _private: () })
         } else {
             Err(InvalidCompass { expected: signature.ratio(), found: sum })
         }
     }
 
     pub fn nanos(&self) -> NaturalRatio {
-        self.notes.iter().map(|note| note.tempo.nanos()).sum()
+        self.note_groups.iter().map(|note| note.tempo.nanos()).sum()
     }
 
     pub fn duration(&self) -> Duration {
