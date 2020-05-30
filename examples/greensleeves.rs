@@ -5,7 +5,7 @@ use mursic::{
     player::Player,
     song::{PlayableSongBuilder, SongBuilder},
     tempo::{Dot, NoteValue, TimeSignature},
-    wave::SquareWaveBuilder,
+    wave::SawWaveBuilder,
 };
 
 fn main() {
@@ -39,8 +39,8 @@ fn main() {
 
     let song = builder.clear_finish();
 
-    let playable = PlayableSongBuilder::default()
-        .finish(song, SquareWaveBuilder::default());
+    let playable =
+        PlayableSongBuilder::default().finish(song, SawWaveBuilder::default());
     let player = Player::new().unwrap();
     player.play(playable);
     player.wait();

@@ -1,5 +1,6 @@
 use crate::{
     compass::{Compass, InvalidCompass},
+    effects::LinearFadeOutBuilder,
     note::{Note, NoteGroup, NoteKind},
     num::{DurationExt, Natural, NaturalRatio, Real},
     pitch::{Key, Pitch},
@@ -323,10 +324,12 @@ where
                 let total = (nanos + self.correction).to_integer();
                 let duration = Duration::from_raw_nanos(total);
                 let mut source = Box::new(
-                    self.instrument
-                        .freq(note.pitch.freq(self.a5))
-                        .finish()
-                        .take_duration(duration),
+                    LinearFadeOutBuilder::default().final_vol(0.5).finish(
+                        self.instrument
+                            .freq(note.pitch.freq(self.a5))
+                            .finish()
+                            .take_duration(duration),
+                    ),
                 );
                 if let Some(sample) = source.next() {
                     samples.push(sample);
