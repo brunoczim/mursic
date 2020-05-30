@@ -1,5 +1,4 @@
 use mursic::{
-    note::NoteKind,
     num::NaturalRatio,
     pitch::{Key, Pitch},
     player::Player,

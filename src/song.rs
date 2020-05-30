@@ -3,7 +3,7 @@ use crate::{
     note::{Note, NoteGroup, NoteKind},
     num::{DurationExt, Natural, NaturalRatio, Real},
     pitch::{Key, Pitch},
-    source::{SilenceBuilder, Source, SourceBuilder},
+    source::Source,
     tempo::{Dot, NoteTime, NoteValue, TimeSignature},
     wave::{Wave, WaveBuilder},
 };
@@ -283,6 +283,55 @@ where
             }
         }
     }
+
+    fn make_samples(&mut self) -> Vec<f64> {
+        let mut samples = Vec::with_capacity(self.sources.len());
+        let mut i = 0;
+
+        while let Some(source) = self.sources.get_mut(i) {
+            if let Some(sample) = source.next() {
+                samples.push(sample);
+                i += 1;
+            } else {
+                self.sources.remove(i);
+            }
+        }
+        samples
+    }
+
+    fn next_group(&mut self, samples: &mut Vec<f64>) -> bool {
+        let compass = match self.song.compasses.get(self.curr_compass) {
+            Some(compass) => compass,
+            None => return false,
+        };
+
+        let group = loop {
+            match compass.note_groups.get(self.curr_group) {
+                Some(group) => break group,
+                None => {
+                    self.curr_group = 0;
+                    self.curr_compass += 1;
+                },
+            }
+        };
+
+        for &note in &group.notes {
+            if note.kind != NoteKind::Ligature {
+                let nanos = self.note_nanos(note);
+                let total = (nanos + self.correction).to_integer();
+                let duration = Duration::from_raw_nanos(total);
+                let mut source =
+                    Box::new(self.instrument.finish().take_duration(duration));
+                if let Some(sample) = source.next() {
+                    samples.push(sample);
+                    self.sources.push(source);
+                }
+            }
+        }
+        self.curr_group += 1;
+
+        true
+    }
 }
 
 impl<W> fmt::Debug for PlayableSong<W>
@@ -313,7 +362,16 @@ where
     type Item = f64;
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {}
+        let mut samples = self.make_samples();
+
+        self.group_remaining = self.group_remaining.saturating_sub(1);
+        if self.group_remaining == 0 {
+            if !self.next_group(&mut samples) {
+                return None;
+            }
+        }
+
+        Some(samples.iter().sum())
     }
 }
 
