@@ -2,7 +2,10 @@ use crate::{
     effects::{LinearFadeOut, LinearFadeOutBuilder, Take},
     num::{Natural, NaturalRatio, Real},
 };
-use std::time::Duration;
+use std::{
+    io::{Seek, Write},
+    time::Duration,
+};
 
 pub trait Source: Iterator<Item = Real> + Send + Sync {
     fn len(&self) -> Option<usize>;
@@ -41,6 +44,29 @@ pub trait Source: Iterator<Item = Real> + Send + Sync {
         );
         let nanos = NaturalRatio::from(duration.as_nanos());
         self.take_samples((nanos / sample_time).round().to_integer() as usize)
+    }
+
+    fn to_wav<W>(self, target: W) -> Result<(), hound::Error>
+    where
+        Self: Sized,
+        W: Write + Seek,
+    {
+        let mut writer = hound::WavWriter::new(
+            target,
+            hound::WavSpec {
+                channels: self.channels(),
+                sample_rate: self.sample_rate(),
+                bits_per_sample: 32,
+                sample_format: hound::SampleFormat::Float,
+            },
+        )?;
+
+        for sample in self {
+            writer.write_sample(sample as f32)?;
+        }
+
+        writer.flush()?;
+        Ok(())
     }
 }
 
