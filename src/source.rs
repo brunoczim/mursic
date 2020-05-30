@@ -1,6 +1,6 @@
 use crate::{
-    effects::{LinearFadeOut, LinearFadeOutBuilder, TakeDuration},
-    num::Real,
+    effects::{LinearFadeOut, LinearFadeOutBuilder, Take},
+    num::{Natural, NaturalRatio, Real},
 };
 use std::time::Duration;
 
@@ -24,11 +24,23 @@ pub trait Source: Iterator<Item = Real> + Send + Sync {
         LinearFadeOutBuilder::default().finish(self)
     }
 
-    fn take_duration(self, duration: Duration) -> TakeDuration<Self>
+    fn take_samples(self, samples: usize) -> Take<Self>
     where
         Self: Sized,
     {
-        TakeDuration::new(self, duration)
+        Take::new(self, samples)
+    }
+
+    fn take_duration(self, duration: Duration) -> Take<Self>
+    where
+        Self: Sized,
+    {
+        let sample_time = NaturalRatio::new(
+            Duration::from_secs(1).as_nanos(),
+            self.sample_rate() as Natural,
+        );
+        let nanos = NaturalRatio::from(duration.as_nanos());
+        self.take_samples((nanos / sample_time).round().to_integer() as usize)
     }
 }
 

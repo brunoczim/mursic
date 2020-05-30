@@ -2,7 +2,6 @@ use crate::{
     num::{DurationExt, Natural, NaturalRatio, Real},
     source::Source,
 };
-use num::{traits::CheckedSub, Zero};
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
@@ -106,66 +105,56 @@ impl LinearFadeOutBuilder {
 }
 
 #[derive(Debug, Clone)]
-pub struct TakeDuration<S>
+pub struct Take<S>
 where
     S: Source,
 {
     inner: S,
     channels: u16,
     channel: u16,
-    remaining: NaturalRatio,
+    rem_samples: usize,
 }
 
-impl<S> TakeDuration<S>
+impl<S> Take<S>
 where
     S: Source,
 {
-    pub(crate) fn new(inner: S, duration: Duration) -> Self {
+    pub(crate) fn new(inner: S, samples: usize) -> Self {
         let channels = inner.channels();
-        Self {
-            channels,
-            channel: channels,
-            inner,
-            remaining: NaturalRatio::from(duration.as_nanos()),
-        }
+        Self { channels, channel: channels, inner, rem_samples: samples }
     }
 
-    fn max_duration(&self) -> Duration {
-        Duration::from_raw_nanos(self.remaining.to_integer())
+    pub fn max_duration(&self) -> Duration {
+        let sample_time = NaturalRatio::new(
+            Duration::from_secs(1).as_nanos(),
+            self.sample_rate() as Natural,
+        );
+        let len = NaturalRatio::from(self.rem_samples as Natural);
+        let nanos = (len * sample_time).round().to_integer();
+        Duration::from_raw_nanos(nanos)
     }
 
-    fn max_len(&self) -> usize {
-        let one_sec = Duration::from_secs(1).as_nanos();
-        let rate = self.sample_rate() as Natural;
-        let nanos_per_sample = NaturalRatio::new(rate, one_sec);
-        let nanos = NaturalRatio::from(self.max_duration().as_nanos());
-        let total_ratio = nanos_per_sample * nanos;
-
-        total_ratio.to_integer() as usize
+    pub fn max_len(&self) -> usize {
+        self.rem_samples
     }
 }
 
-impl<S> Iterator for TakeDuration<S>
+impl<S> Iterator for Take<S>
 where
     S: Source,
 {
     type Item = Real;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.remaining.is_zero() {
+        if self.rem_samples == 0 {
             return None;
         }
 
         self.channel = self.channel.saturating_sub(1);
         if self.channel == 0 {
             self.channel = self.channels();
-            let one_sec = Duration::from_secs(1).as_nanos();
-            let rate = self.sample_rate() as Natural;
-            self.remaining = self
-                .remaining
-                .checked_sub(&NaturalRatio::new(one_sec, rate))
-                .unwrap_or(Zero::zero());
-            if self.remaining.is_zero() {
+            self.rem_samples -= 1;
+            if self.rem_samples == 0 {
                 return None;
             }
         }
@@ -174,7 +163,7 @@ where
     }
 }
 
-impl<S> Source for TakeDuration<S>
+impl<S> Source for Take<S>
 where
     S: Source,
 {

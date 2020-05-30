@@ -1,5 +1,5 @@
 use mursic::{
-    manner::MannerKind,
+    note::NoteKind,
     num::NaturalRatio,
     pitch::{Key, Pitch},
     player::Player,
@@ -27,12 +27,7 @@ fn main() {
     make_mid(octave, &mut builder);
     make_first_outro(octave, &mut builder);
 
-    builder
-        .manner_kind(MannerKind::Rest)
-        .note_value(NoteValue::Quarter)
-        .dot(Dot::None)
-        .note()
-        .compass();
+    builder.note_value(NoteValue::Quarter).dot(Dot::None).note().compass();
 
     make_chorus_intro(octave, &mut builder);
     make_mid(octave, &mut builder);
@@ -51,64 +46,74 @@ fn make_verse_intro(octave: u32, builder: &mut SongBuilder) {
     builder
         .pitch(Pitch { octave, key: Key::A })
         .note_value(NoteValue::Quarter)
-        .manner_kind(MannerKind::Plain)
         .dot(Dot::None)
         .note()
+        .note_group()
         .compass()
         .signature(TimeSignature { numer: 3, denom: NoteValue::Quarter })
         .pitch(Pitch { octave: octave + 1, key: Key::C })
         .note_value(NoteValue::Half)
         .note()
+        .note_group()
         .pitch(Pitch { octave: octave + 1, key: Key::D })
         .note_value(NoteValue::Quarter)
         .note()
+        .note_group()
         .compass()
         .pitch(Pitch { octave: octave + 1, key: Key::E })
         .dot(Dot::Single)
-        .note();
+        .note()
+        .note_group();
 }
 
 fn make_chorus_intro(octave: u32, builder: &mut SongBuilder) {
     builder
         .pitch(Pitch { octave: octave + 1, key: Key::G })
         .note_value(NoteValue::Half)
-        .manner_kind(MannerKind::Plain)
         .dot(Dot::Single)
         .note()
+        .note_group()
         .compass()
         .pitch(Pitch { octave: octave + 1, key: Key::G })
         .note_value(NoteValue::Quarter)
-        .note();
+        .note()
+        .note_group();
 }
 
 fn make_mid(octave: u32, builder: &mut SongBuilder) {
     builder
         .pitch(Pitch { octave: octave + 1, key: Key::F })
         .note_value(NoteValue::Eighth)
-        .manner_kind(MannerKind::Plain)
         .dot(Dot::None)
         .note()
+        .note_group()
         .pitch(Pitch { octave: octave + 1, key: Key::E })
         .note_value(NoteValue::Quarter)
         .note()
+        .note_group()
         .compass()
         .pitch(Pitch { octave: octave + 1, key: Key::D })
         .note_value(NoteValue::Half)
         .note()
+        .note_group()
         .pitch(Pitch { octave, key: Key::B })
         .note_value(NoteValue::Quarter)
         .note()
+        .note_group()
         .compass()
         .pitch(Pitch { octave, key: Key::G })
         .dot(Dot::Single)
         .note()
+        .note_group()
         .pitch(Pitch { octave, key: Key::A })
         .dot(Dot::None)
         .note_value(NoteValue::Eighth)
         .note()
+        .note_group()
         .pitch(Pitch { octave, key: Key::B })
         .note_value(NoteValue::Quarter)
         .note()
+        .note_group()
         .compass();
 }
 
@@ -116,67 +121,79 @@ fn make_first_outro(octave: u32, builder: &mut SongBuilder) {
     builder
         .pitch(Pitch { octave: octave + 1, key: Key::C })
         .note_value(NoteValue::Half)
-        .manner_kind(MannerKind::Plain)
         .dot(Dot::None)
         .note()
+        .note_group()
         .pitch(Pitch { octave, key: Key::A })
         .note_value(NoteValue::Quarter)
         .note()
+        .note_group()
         .compass()
         .pitch(Pitch { octave, key: Key::A })
         .dot(Dot::Single)
         .note()
+        .note_group()
         .pitch(Pitch { octave, key: Key::Ab })
         .dot(Dot::None)
         .note_value(NoteValue::Eighth)
         .note()
+        .note_group()
         .pitch(Pitch { octave, key: Key::A })
         .note_value(NoteValue::Quarter)
         .note()
+        .note_group()
         .compass()
         .pitch(Pitch { octave, key: Key::B })
         .note_value(NoteValue::Half)
         .note()
+        .note_group()
         .pitch(Pitch { octave, key: Key::Ab })
         .note_value(NoteValue::Quarter)
         .note()
+        .note_group()
         .compass()
         .pitch(Pitch { octave, key: Key::E })
         .note_value(NoteValue::Half)
-        .note();
+        .note()
+        .note_group();
 }
 
 fn make_second_outro(octave: u32, builder: &mut SongBuilder) {
     builder
         .pitch(Pitch { octave: octave + 1, key: Key::C })
-        .manner_kind(MannerKind::Plain)
         .note_value(NoteValue::Quarter)
         .dot(Dot::Single)
         .note()
+        .note_group()
         .pitch(Pitch { octave, key: Key::B })
         .note_value(NoteValue::Eighth)
         .dot(Dot::None)
         .note()
+        .note_group()
         .pitch(Pitch { octave, key: Key::A })
         .note_value(NoteValue::Quarter)
         .note()
+        .note_group()
         .compass()
         .pitch(Pitch { octave, key: Key::Ab })
         .dot(Dot::Single)
         .note()
+        .note_group()
         .pitch(Pitch { octave, key: Key::Gb })
         .dot(Dot::None)
         .note_value(NoteValue::Eighth)
         .note()
+        .note_group()
         .pitch(Pitch { octave, key: Key::Ab })
         .note_value(NoteValue::Quarter)
         .note()
+        .note_group()
         .compass()
         .pitch(Pitch { octave, key: Key::A })
         .note_value(NoteValue::Half)
         .note()
+        .note_group()
         .note_value(NoteValue::Quarter)
-        .manner_kind(MannerKind::Rest)
-        .note()
+        .note_group()
         .compass();
 }

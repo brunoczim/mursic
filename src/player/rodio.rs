@@ -23,6 +23,7 @@ impl Backend for Rodio {
         S: Source + 'static,
     {
         self.sink.append(Bridge {
+            total_duration: source.duration(),
             rate: source.sample_rate(),
             channels: source.channels(),
             inner: source,
@@ -42,6 +43,7 @@ where
 {
     inner: S,
     channels: u16,
+    total_duration: Option<Duration>,
     rate: u32,
 }
 
@@ -61,7 +63,7 @@ where
     S: Source,
 {
     fn total_duration(&self) -> Option<Duration> {
-        self.inner.duration()
+        self.total_duration
     }
 
     fn current_frame_len(&self) -> Option<usize> {

@@ -1,7 +1,7 @@
 use mursic::{
     effects::LinearFadeOutBuilder,
     player::Player,
-    source::Source,
+    source::{Source, SourceBuilder},
     wave::{
         SawWaveBuilder,
         SineWaveBuilder,

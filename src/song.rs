@@ -223,17 +223,15 @@ impl PlayableSongBuilder {
         W::Source: Wave + 'static,
     {
         PlayableSong {
-            curr_wave: Box::new(
-                instrument.finish().take_duration(Duration::from_secs(0)),
-            ),
             a5: self.a5,
             instrument,
-            remaining: song.nanos(),
+            total_remaining: song.nanos(),
             correction: NaturalRatio::zero(),
+            group_remaining: 0,
             song,
             curr_compass: self.start_compass,
-            curr_note: 0,
-            curr_pitch: None,
+            curr_group: 0,
+            sources: Vec::new(),
         }
     }
 }
@@ -244,14 +242,14 @@ where
     W::Source: Wave + 'static,
 {
     a5: Real,
-    instrument: W,
-    remaining: NaturalRatio,
-    correction: NaturalRatio,
     song: Song,
+    instrument: W,
+    total_remaining: NaturalRatio,
+    correction: NaturalRatio,
+    group_remaining: usize,
     curr_compass: usize,
-    curr_note: usize,
-    curr_pitch: Option<Pitch>,
-    curr_wave: Box<dyn Source>,
+    curr_group: usize,
+    sources: Vec<Box<dyn Source>>,
 }
 
 impl<W> PlayableSong<W>
@@ -259,6 +257,32 @@ where
     W: WaveBuilder + Send + Sync,
     W::Source: Wave + 'static,
 {
+    fn note_nanos(&self, note: Note) -> NaturalRatio {
+        let mut curr_group = self.curr_group;
+        let mut curr_compass = self.curr_compass;
+        let mut nanos = NaturalRatio::from(0);
+        let ligature = Note { kind: NoteKind::Ligature, ..note };
+
+        loop {
+            let compass = match self.song.compasses.get(curr_compass) {
+                Some(comp) => comp,
+                None => break nanos,
+            };
+
+            match compass.note_groups.get(curr_group) {
+                Some(group) => {
+                    if !group.notes.contains(&ligature) {
+                        break nanos;
+                    }
+                    nanos += group.tempo.nanos();
+                },
+                None => {
+                    curr_group = 0;
+                    curr_compass += 1;
+                },
+            }
+        }
+    }
 }
 
 impl<W> fmt::Debug for PlayableSong<W>
@@ -269,13 +293,14 @@ where
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("PlayableSong")
             .field("a5", &self.a5)
-            .field("instrument", &self.instrument)
-            .field("remaining", &self.remaining)
-            .field("correction", &self.correction)
             .field("song", &self.song)
+            .field("instrument", &self.instrument)
+            .field("total_remaining", &self.total_remaining)
+            .field("correction", &self.correction)
+            .field("group_remaining", &self.group_remaining)
             .field("curr_compass", &self.curr_compass)
-            .field("curr_note", &self.curr_note)
-            .field("curr_pitch", &self.curr_pitch)
+            .field("curr_group", &self.curr_group)
+            .field("sources", &self.sources.len())
             .finish()
     }
 }
@@ -288,64 +313,7 @@ where
     type Item = f64;
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            if let Some(ret) = self.curr_wave.next() {
-                break Some(ret);
-            }
-
-            let note = loop {
-                match self
-                    .song
-                    .compasses
-                    .get(self.curr_compass)?
-                    .note_groups
-                    .get(self.curr_note)
-                {
-                    Some(note) => break note,
-                    None => {
-                        self.curr_note = 0;
-                        self.curr_compass += 1;
-                    },
-                }
-            };
-
-            let pitch = match note.pitch {
-                Manner::Plain(note) => Some(note),
-                Manner::Ligature => Some(
-                    self.curr_pitch.expect("Cannot start song with ligature"),
-                ),
-                Manner::Rest => None,
-            };
-            self.curr_pitch = pitch;
-
-            let mut time = note.tempo.nanos().to_integer();
-            self.correction += note.tempo.nanos().fract();
-            if self.correction.to_integer() > 0 {
-                time += self.correction.to_integer();
-                self.correction = self.correction.fract();
-            }
-
-            let duration = Duration::from_raw_nanos(time);
-
-            self.curr_wave = match pitch {
-                Some(pitch) => Box::new(
-                    self.instrument
-                        .freq(pitch.freq(self.a5))
-                        .finish()
-                        .take_duration(duration),
-                ),
-
-                None => Box::new(
-                    SilenceBuilder::default()
-                        .sample_rate(self.sample_rate())
-                        .channels(self.channels())
-                        .finish()
-                        .take_duration(duration),
-                ),
-            };
-
-            self.curr_note += 1;
-        }
+        loop {}
     }
 }
 
@@ -355,13 +323,14 @@ where
     W::Source: Wave + 'static,
 {
     fn len(&self) -> Option<usize> {
-        let nanos = self.song.nanos().to_integer();
-        let rate = self.sample_rate() as Natural;
-        Some((nanos / rate) as usize)
+        let nanos = self.total_remaining;
+        let rate = NaturalRatio::from(self.sample_rate() as Natural);
+        Some((nanos / rate).to_integer() as usize)
     }
 
     fn duration(&self) -> Option<Duration> {
-        Some(self.song.duration())
+        let nanos = self.total_remaining.to_integer();
+        Some(Duration::from_raw_nanos(nanos))
     }
 
     fn sample_rate(&self) -> u32 {
