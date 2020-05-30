@@ -13,3 +13,6 @@ wasm-bindgen = "0.2.62"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 rodio = "0.11"
+
+[dev-dependencies]
+structopt = "0.3.14"
