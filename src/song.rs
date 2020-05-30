@@ -7,7 +7,7 @@ use crate::{
     tempo::{Dot, NoteTime, NoteValue, TimeSignature},
     wave::{Wave, WaveBuilder},
 };
-use num::Zero;
+use num::{traits::CheckedSub, Zero};
 use std::{collections::BTreeSet, fmt, mem, time::Duration};
 
 #[derive(Debug, Clone)]
@@ -261,7 +261,7 @@ where
         let mut curr_group = self.curr_group;
         let mut curr_compass = self.curr_compass;
         let mut nanos = NaturalRatio::from(0);
-        let ligature = Note { kind: NoteKind::Ligature, ..note };
+        let mut target = note;
 
         loop {
             let compass = match self.song.compasses.get(curr_compass) {
@@ -271,10 +271,12 @@ where
 
             match compass.note_groups.get(curr_group) {
                 Some(group) => {
-                    if !group.notes.contains(&ligature) {
+                    if !group.notes.contains(&target) {
                         break nanos;
                     }
                     nanos += group.tempo.nanos();
+                    target = Note { kind: NoteKind::Ligature, ..target };
+                    curr_group += 1;
                 },
                 None => {
                     curr_group = 0;
@@ -300,12 +302,12 @@ where
     }
 
     fn next_group(&mut self, samples: &mut Vec<f64>) -> bool {
-        let compass = match self.song.compasses.get(self.curr_compass) {
-            Some(compass) => compass,
-            None => return false,
-        };
-
         let group = loop {
+            let compass = match self.song.compasses.get(self.curr_compass) {
+                Some(compass) => compass,
+                None => return false,
+            };
+
             match compass.note_groups.get(self.curr_group) {
                 Some(group) => break group,
                 None => {
@@ -320,15 +322,26 @@ where
                 let nanos = self.note_nanos(note);
                 let total = (nanos + self.correction).to_integer();
                 let duration = Duration::from_raw_nanos(total);
-                let mut source =
-                    Box::new(self.instrument.finish().take_duration(duration));
+                let mut source = Box::new(
+                    self.instrument
+                        .freq(note.pitch.freq(self.a5))
+                        .finish()
+                        .take_duration(duration),
+                );
                 if let Some(sample) = source.next() {
                     samples.push(sample);
                     self.sources.push(source);
                 }
             }
         }
+
         self.curr_group += 1;
+        let nanos = group.tempo.nanos() + self.correction;
+        let one_sec = Duration::from_secs(1).as_nanos();
+        let sample_nanos =
+            NaturalRatio::new(one_sec, self.sample_rate() as Natural);
+        self.group_remaining = (nanos / sample_nanos).to_integer() as usize;
+        self.correction = nanos.fract();
 
         true
     }
@@ -364,14 +377,21 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let mut samples = self.make_samples();
 
-        self.group_remaining = self.group_remaining.saturating_sub(1);
         if self.group_remaining == 0 {
             if !self.next_group(&mut samples) {
                 return None;
             }
         }
+        self.group_remaining = self.group_remaining.saturating_sub(1);
 
-        Some(samples.iter().sum())
+        let one_sec = Duration::from_secs(1).as_nanos();
+        let time = NaturalRatio::new(one_sec, self.sample_rate() as Natural);
+        self.total_remaining = self
+            .total_remaining
+            .checked_sub(&time)
+            .unwrap_or(NaturalRatio::zero());
+
+        Some(samples.iter().sum::<f64>())
     }
 }
 

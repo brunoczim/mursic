@@ -26,7 +26,11 @@ fn main() {
     make_mid(octave, &mut builder);
     make_first_outro(octave, &mut builder);
 
-    builder.note_value(NoteValue::Quarter).dot(Dot::None).note().compass();
+    builder
+        .note_value(NoteValue::Quarter)
+        .dot(Dot::None)
+        .note_group()
+        .compass();
 
     make_chorus_intro(octave, &mut builder);
     make_mid(octave, &mut builder);
